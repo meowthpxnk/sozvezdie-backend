@@ -1,0 +1,54 @@
+version: 1
+disable_existing_loggers: False
+
+formatters:
+    simple:
+        (): app.logging.formatters.BaseFormatter
+        settings:
+            module: True
+
+    colorized:
+        (): app.logging.formatters.ColorisedFormatter
+        settings:
+            module: True
+            log_path: True
+
+    colorized.module:
+        (): app.logging.formatters.ColorisedFormatter
+        settings:
+            module: True
+
+handlers:
+    console:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: colorized
+        stream: ext://sys.stdout
+
+    console.module:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: colorized.module
+        stream: ext://sys.stdout
+
+    file:
+        class: logging.FileHandler
+        level: INFO
+        formatter: simple
+        filename: LOGGING.LOG
+
+loggers:
+    uvicorn:
+        level: INFO
+        handlers: [console.module, file]
+
+    alembic:
+        level: INFO
+        handlers: [console.module, file]
+
+    app:
+        level: INFO
+        handlers: [console, file]
+
+    app.api:
+        level: ERROR

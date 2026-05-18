@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+    # 🐍 Main Python application
+    app:
+        container_name: sozvezdie-api
+        profiles: ["prod"]
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - "8000:8000"
+        depends_on:
+            - redis
+            - postgres
+        # environment:
+        #   # - REDIS_HOST=redis
+        #   # - REDIS_PORT=6379
+        #   # - POSTGRES_HOST=postgres
+        #   # - POSTGRES_PORT=5432
+        #   # - POSTGRES_DB=app_db
+        #   # - POSTGRES_USER=app_user
+        #   # - POSTGRES_PASSWORD=app_password
+        # volumes:
+        #   - .:/app
+        # restart: unless-stopped
+
+    redis:
+        container_name: sozvezdie-redis
+        image: redis:7-alpine
+        ports:
+            - "4001:6379"
+        restart: unless-stopped
+
+    postgres:
+        container_name: sozvezdie-postgres
+        image: postgres:15-alpine
+        environment:
+            POSTGRES_DB: app_db
+            POSTGRES_USER: app_user
+            POSTGRES_PASSWORD: app_password
+        ports:
+            - "4002:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        restart: unless-stopped
+    minio:
+        container_name: sozvezdie-minio
+        image: quay.io/minio/minio:RELEASE.2023-11-01T01-57-10Z-cpuv1
+        ports:
+            - "4003:9000"
+            - "4004:9001"
+        volumes:
+            - minio_data:/data
+        environment:
+            MINIO_ROOT_USER: minio99
+            MINIO_ROOT_PASSWORD: minio123
+        command: server /data --console-address ":9001"
+        restart: unless-stopped
+
+    minio-init:
+        image: minio/mc
+        depends_on:
+            - minio
+
+        entrypoint: >
+            /bin/sh -c "
+            sleep 5;
+
+            mc alias set local http://minio:9000 minio99 minio123;
+
+            mc mb --ignore-existing local/images-bucket;
+
+            mc anonymous set download local/images-bucket;
+
+            exit 0;
+            "
+volumes:
+    postgres_data:
+    minio_data:

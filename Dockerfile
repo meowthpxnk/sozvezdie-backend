@@ -48,6 +48,7 @@ ENV PATH="/home/app/.local/bin:$PATH"
 # 🔄 Update paths below if your structure is different
 # COPY --chown=app:app ./scripts ./scripts
 COPY --chown=app:app ./app ./app
+COPY --chown=app:app ./config ./config
 COPY --chown=app:app ./run.py .
 COPY --chown=app:app ./entrypoint.sh .
 # ✅ Optional: if you use src/

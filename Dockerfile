@@ -16,6 +16,13 @@ RUN poetry config virtualenvs.create false
 # Copy project files
 COPY pyproject.toml poetry.lock ./
 
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install production dependencies only
 # 💼 No dev tools in final image
 RUN poetry install --no-root

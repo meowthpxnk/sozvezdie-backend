@@ -27,7 +27,7 @@ services:
         #   - .:/app
         # restart: unless-stopped
         networks:
-            - appnet
+            - nginx_appnet
 
     redis:
         container_name: sozvezdie-redis
@@ -63,7 +63,7 @@ services:
         command: server /data --console-address ":9001"
         restart: unless-stopped
         networks:
-            - appnet
+            - nginx_appnet
 
     minio-init:
         image: minio/mc
@@ -87,5 +87,5 @@ volumes:
     minio_data:
 
 networks:
-    appnet:
+    nginx_appnet:
         external: true

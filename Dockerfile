@@ -53,6 +53,7 @@ COPY --chown=app:app ./static ./static
 COPY --chown=app:app ./jwt_keys ./jwt_keys
 COPY --chown=app:app ./run.py .
 COPY --chown=app:app ./entrypoint.sh .
+COPY --chown=app:app ./database ./database
 # ✅ Optional: if you use src/
 # COPY --chown=app:app ./src ./src
 # 🔐 Optional: for local dev (never in prod!)

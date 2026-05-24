@@ -15,6 +15,10 @@ services:
             - postgres
         env_file:
             - .test.env
+        networks:
+            - nginx_appnet
+        # networks:
+        #     - nginx_appnet
         # environment:
         #   # - REDIS_HOST=redis
         #   # - REDIS_PORT=6379
@@ -26,8 +30,6 @@ services:
         # volumes:
         #   - .:/app
         # restart: unless-stopped
-        networks:
-            - nginx_appnet
 
     redis:
         container_name: sozvezdie-redis

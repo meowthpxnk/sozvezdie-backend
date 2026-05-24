@@ -14,7 +14,7 @@ def startup():
     uvicorn.run(
         "app.core.api:api.api",  # 🔥 строка обязательна
         host="0.0.0.0",
-        port=2000,
+        port=8000,
         log_config=LOGGING_CONFIG,
         reload=True,
     )

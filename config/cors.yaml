@@ -1,5 +1,7 @@
 allow_origins:
   - "http://localhost:3000"
+  - "http://localhost:3001"
+  - "https://soz-front.meowthland.ru"
 allow_headers:
   - "*"
 allow_methods:

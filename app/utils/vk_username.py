@@ -1,7 +1,10 @@
+import logging
 import random
 import re
 
 from fastapi import HTTPException, status
+
+logger = logging.getLogger("app")
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.specs.user import UserSpec
@@ -52,6 +55,12 @@ async def allocate_username(
         if existing is None:
             return candidate
 
+    logger.warning(
+        "Could not allocate username after %s attempts (screen_name=%s, base=%s)",
+        _MAX_ATTEMPTS,
+        screen_name,
+        base,
+    )
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail="Could not allocate username",

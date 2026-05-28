@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 from uuid import uuid4
 
@@ -19,6 +20,16 @@ from app.schemas.schemas import ChangePasswordForm, UserCreateForm
 from app.schemas.vk import VkAuthoriseRequest
 from app.services import UserService
 from app.services.vk_auth import VkAuthService
+
+logger = logging.getLogger("app")
+
+
+def _mask_vk_token(token: str) -> str:
+    if not token:
+        return "<empty>"
+    if len(token) <= 8:
+        return f"<len={len(token)}>"
+    return f"<len={len(token)}, …{token[-4:]}>"
 
 
 class LoginRequest(BaseModel):
@@ -49,11 +60,31 @@ async def authorise_vk(
     auth_api: AuthAPIDepends,
     db_session: DatabaseDepends,
 ):
-    access_token = await VkAuthService(db_session).login_or_register(
-        data.vk_access_token,
-        auth_api,
-        response,
-    )
+    token = data.vk_access_token.strip()
+    logger.info("POST /authorise_vk token=%s", _mask_vk_token(token))
+
+    try:
+        access_token = await VkAuthService(db_session).login_or_register(
+            token,
+            auth_api,
+            response,
+        )
+    except HTTPException as exc:
+        logger.warning(
+            "POST /authorise_vk failed token=%s status=%s detail=%s",
+            _mask_vk_token(token),
+            exc.status_code,
+            exc.detail,
+        )
+        raise
+    except Exception as exc:
+        logger.exception(
+            "POST /authorise_vk unexpected error token=%s",
+            _mask_vk_token(token),
+        )
+        raise
+
+    logger.info("POST /authorise_vk success token=%s", _mask_vk_token(token))
     return {"Access-Token": access_token}
 
 

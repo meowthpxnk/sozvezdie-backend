@@ -16,7 +16,9 @@ from app.core.super_moderator import resolve_auth_role
 from app.schemas.api.responses import MeResponse
 from app.exceptions.security import WrongSecret
 from app.schemas.schemas import ChangePasswordForm, UserCreateForm
+from app.schemas.vk import VkAuthoriseRequest
 from app.services import UserService
+from app.services.vk_auth import VkAuthService
 
 
 class LoginRequest(BaseModel):
@@ -36,6 +38,21 @@ async def login(
 ):
     access_token = await auth_api.authorize_user(
         data.username, data.password, response=response, db_session=db_session
+    )
+    return {"Access-Token": access_token}
+
+
+@router.post("/authorise_vk")
+async def authorise_vk(
+    response: Response,
+    data: VkAuthoriseRequest,
+    auth_api: AuthAPIDepends,
+    db_session: DatabaseDepends,
+):
+    access_token = await VkAuthService(db_session).login_or_register(
+        data.vk_access_token,
+        auth_api,
+        response,
     )
     return {"Access-Token": access_token}
 

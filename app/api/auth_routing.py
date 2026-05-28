@@ -24,6 +24,7 @@ from fastapi import Depends
 
 from fastapi import Response
 from sqlalchemy.ext.asyncio import AsyncSession as AsyncDBSession
+from app.models.user import User as UserModel
 from app.services.user import UserService
 from app.utils.security import verify_secret
 
@@ -461,6 +462,19 @@ class AuthAPI:
         user = await self._authorize_user(username, password, db_session)
         access_token, refresh_token = await self.auth_service.create_session(
             user
+        )
+        self._set_refresh_token_cookie(refresh_token, response)
+        return access_token
+
+    async def authorize_vk_user(
+        self, user: UserModel, response: Response
+    ) -> str:
+        auth_user = User(
+            username=user.username,
+            role=resolve_auth_role(user.username, user.role),
+        )
+        access_token, refresh_token = await self.auth_service.create_session(
+            auth_user
         )
         self._set_refresh_token_cookie(refresh_token, response)
         return access_token

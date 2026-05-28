@@ -1,6 +1,7 @@
 version: "3.8"
 
 services:
+    # 🐍 Main Python application
     app:
         container_name: sozvezdie-api
         profiles: ["prod"]
@@ -16,6 +17,19 @@ services:
             - .test.env
         networks:
             - nginx_appnet
+        # networks:
+        #     - nginx_appnet
+        # environment:
+        #   # - REDIS_HOST=redis
+        #   # - REDIS_PORT=6379
+        #   # - POSTGRES_HOST=postgres
+        #   # - POSTGRES_PORT=5432
+        #   # - POSTGRES_DB=app_db
+        #   # - POSTGRES_USER=app_user
+        #   # - POSTGRES_PASSWORD=app_password
+        # volumes:
+        #   - .:/app
+        # restart: unless-stopped
 
     redis:
         container_name: sozvezdie-redis
@@ -23,8 +37,6 @@ services:
         ports:
             - "4001:6379"
         restart: unless-stopped
-        networks:
-            - nginx_appnet
 
     postgres:
         container_name: sozvezdie-postgres
@@ -38,8 +50,6 @@ services:
         volumes:
             - postgres_data:/var/lib/postgresql/data
         restart: unless-stopped
-        networks:
-            - nginx_appnet
 
     minio:
         container_name: sozvezdie-minio
@@ -61,17 +71,19 @@ services:
         image: minio/mc
         depends_on:
             - minio
-        networks:
-            - nginx_appnet
+
         entrypoint: >
             /bin/sh -c "
             sleep 5;
+
             mc alias set local http://minio:9000 minio99 minio123;
+
             mc mb --ignore-existing local/images-bucket;
+
             mc anonymous set download local/images-bucket;
+
             exit 0;
             "
-
 volumes:
     postgres_data:
     minio_data:

@@ -17,4 +17,5 @@ from .seller_card import SellerCard
 from .seller_card_moderation import SellerCardModeration, SellerCardModerationAction
 from .user_settings import UserSettings
 from .user import User
+from .vk_id_mapping import VkIdMapping
 from .advert_banner import AdvertBanner

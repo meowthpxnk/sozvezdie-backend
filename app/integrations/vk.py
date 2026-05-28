@@ -1,6 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 import httpx
 from fastapi import HTTPException, status
@@ -10,6 +11,9 @@ logger = logging.getLogger("app")
 VK_API_URL = "https://api.vk.com/method/users.get"
 VK_API_VERSION = os.getenv("VK_API_VERSION", "5.199")
 VK_HTTP_TIMEOUT = 10.0
+VK_OAUTH_DOMAIN = os.getenv("VK_OAUTH_DOMAIN", "id.vk.ru")
+VK_CLIENT_ID = os.getenv("VK_CLIENT_ID", "")
+VK_REDIRECT_URI = os.getenv("VK_REDIRECT_URI", "")
 
 
 @dataclass(frozen=True)
@@ -25,7 +29,105 @@ def _mask_token(token: str) -> str:
         return "<empty>"
     if len(token) <= 8:
         return f"<len={len(token)}>"
-    return f"<len={len(token)}, …{token[-4:]}>"
+    return f"<len={len(token)}, …{token[-4:]}"
+
+
+def _mask_code(code: str) -> str:
+    if not code:
+        return "<empty>"
+    if len(code) <= 12:
+        return f"<len={len(code)}>"
+    return f"<len={len(code)}, …{code[-6:]}"
+
+
+async def exchange_code_for_access_token(
+    code: str,
+    device_id: str,
+    code_verifier: str,
+) -> str:
+    if not VK_CLIENT_ID or not VK_REDIRECT_URI:
+        logger.error(
+            "VK OAuth not configured: VK_CLIENT_ID=%s VK_REDIRECT_URI=%s",
+            bool(VK_CLIENT_ID),
+            bool(VK_REDIRECT_URI),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="VK OAuth is not configured on server",
+        )
+
+    query_params = urlencode(
+        {
+            "grant_type": "authorization_code",
+            "redirect_uri": VK_REDIRECT_URI,
+            "device_id": device_id,
+            "client_id": VK_CLIENT_ID,
+            "code_verifier": code_verifier,
+        }
+    )
+    url = f"https://{VK_OAUTH_DOMAIN}/oauth2/auth?{query_params}"
+
+    logger.info(
+        "VK oauth2/auth exchange (code=%s device_id_len=%s verifier_len=%s client_id=%s)",
+        _mask_code(code),
+        len(device_id),
+        len(code_verifier),
+        VK_CLIENT_ID,
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=VK_HTTP_TIMEOUT) as client:
+            response = await client.post(
+                url,
+                json={"code": code},
+                headers={
+                    "Accept": "*/*",
+                    "Content-Type": "application/json",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPError as error:
+        logger.warning(
+            "VK oauth2/auth HTTP error (code=%s): %s",
+            _mask_code(code),
+            error,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="VK token exchange failed",
+        ) from error
+
+    if "error" in payload:
+        logger.warning(
+            "VK oauth2/auth API error (code=%s): %s",
+            _mask_code(code),
+            payload.get("error"),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="VK authorization code exchange failed",
+        )
+
+    access_token = payload.get("access_token")
+    if not access_token or not str(access_token).strip():
+        logger.warning(
+            "VK oauth2/auth missing access_token (code=%s), keys=%s",
+            _mask_code(code),
+            list(payload.keys()),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="VK did not return access token",
+        )
+
+    logger.info(
+        "VK oauth2/auth ok (code=%s, user_id=%s)",
+        _mask_code(code),
+        payload.get("user_id"),
+    )
+    return str(access_token).strip()
 
 
 async def fetch_vk_user(access_token: str) -> VkUserInfo:

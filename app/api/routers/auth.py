@@ -24,14 +24,6 @@ from app.services.vk_auth import VkAuthService
 logger = logging.getLogger("app")
 
 
-def _mask_vk_token(token: str) -> str:
-    if not token:
-        return "<empty>"
-    if len(token) <= 8:
-        return f"<len={len(token)}>"
-    return f"<len={len(token)}, …{token[-4:]}>"
-
-
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -60,31 +52,31 @@ async def authorise_vk(
     auth_api: AuthAPIDepends,
     db_session: DatabaseDepends,
 ):
-    token = data.vk_access_token.strip()
-    logger.info("POST /authorise_vk token=%s", _mask_vk_token(token))
+    logger.info(
+        "POST /authorise_vk code_len=%s device_id_len=%s verifier_len=%s",
+        len(data.code),
+        len(data.device_id),
+        len(data.code_verifier),
+    )
 
     try:
         access_token = await VkAuthService(db_session).login_or_register(
-            token,
+            data,
             auth_api,
             response,
         )
     except HTTPException as exc:
         logger.warning(
-            "POST /authorise_vk failed token=%s status=%s detail=%s",
-            _mask_vk_token(token),
+            "POST /authorise_vk failed status=%s detail=%s",
             exc.status_code,
             exc.detail,
         )
         raise
-    except Exception as exc:
-        logger.exception(
-            "POST /authorise_vk unexpected error token=%s",
-            _mask_vk_token(token),
-        )
+    except Exception:
+        logger.exception("POST /authorise_vk unexpected error")
         raise
 
-    logger.info("POST /authorise_vk success token=%s", _mask_vk_token(token))
+    logger.info("POST /authorise_vk success")
     return {"Access-Token": access_token}
 
 

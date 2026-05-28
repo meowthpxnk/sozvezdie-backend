@@ -5,7 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_routing import AuthAPI
-from app.integrations.vk import fetch_vk_user
+from app.integrations.vk import exchange_code_for_access_token, fetch_vk_user
+from app.schemas.vk import VkAuthoriseRequest
 from app.models import Cart, User, UserSettings, VkIdMapping
 from app.repositories.specs.user import UserSpec
 from app.repositories.user import UserRepository
@@ -26,11 +27,17 @@ class VkAuthService:
 
     async def login_or_register(
         self,
-        vk_access_token: str,
+        data: VkAuthoriseRequest,
         auth_api: AuthAPI,
         response: Response,
     ) -> str:
         logger.info("VkAuthService.login_or_register started")
+
+        vk_access_token = await exchange_code_for_access_token(
+            data.code.strip(),
+            data.device_id.strip(),
+            data.code_verifier.strip(),
+        )
 
         vk_user = await fetch_vk_user(vk_access_token)
 

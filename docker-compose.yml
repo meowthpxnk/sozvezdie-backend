@@ -37,6 +37,8 @@ services:
         ports:
             - "4001:6379"
         restart: unless-stopped
+        networks:
+            - nginx_appnet
 
     postgres:
         container_name: sozvezdie-postgres
@@ -50,6 +52,8 @@ services:
         volumes:
             - postgres_data:/var/lib/postgresql/data
         restart: unless-stopped
+        networks:
+            - nginx_appnet
 
     minio:
         container_name: sozvezdie-minio
@@ -84,6 +88,8 @@ services:
 
             exit 0;
             "
+        networks:
+            - nginx_appnet
 volumes:
     postgres_data:
     minio_data:

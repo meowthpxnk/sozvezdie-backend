@@ -52,6 +52,21 @@ class JWTAuthSettings(BaseSettings):
         alias="JWT_KEYS_PATH",
     )
     algorithm: str = "RS256"
+    # Nginx prefix, e.g. "/api" for https://host/api/... ; empty for local :8000
+    api_root_path: str = Field(
+        "",
+        alias="API_ROOT_PATH",
+    )
+    refresh_cookie_secure: bool = Field(
+        True,
+        alias="REFRESH_COOKIE_SECURE",
+    )
+
+    def refresh_cookie_path(self) -> str:
+        root = self.api_root_path.strip().rstrip("/")
+        if not root:
+            return "/refresh-session"
+        return f"{root}/refresh-session"
 
 
 class RedisSettings(BaseSettings):

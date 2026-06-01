@@ -18,7 +18,7 @@ from app.schemas.auth import (
 )
 from app.settings import JWTAuthSettings
 
-
+import logging
 from fastapi import Depends
 
 
@@ -29,6 +29,14 @@ from app.services.user import UserService
 from app.utils.security import verify_secret
 
 import uuid
+
+logger = logging.getLogger(__name__)
+
+
+def _refresh_token_log_label(token: str | None) -> str:
+    if not token:
+        return "missing"
+    return f"len={len(token)} prefix={token[:8]}..."
 
 
 class SessionException(Exception):
@@ -440,13 +448,29 @@ class AuthAPI:
             SessionString(username, session_id)
         )
 
+    def refresh_cookie_path(self) -> str:
+        return self.settings.refresh_cookie_path()
+
     async def refresh_session(
-        self, refresh_token: str, response: Response
+        self, refresh_token: str | None, response: Response
     ) -> str:
+        logger.info(
+            "refresh_session start token=%s cookie_path=%s",
+            _refresh_token_log_label(refresh_token),
+            self.refresh_cookie_path(),
+        )
+        if not refresh_token:
+            logger.warning("refresh_session aborted: Refresh-Token cookie is missing")
+            raise ValueError("Refresh-Token cookie is missing")
+
         access_token, refresh_token = await self.auth_service.refresh_session(
             refresh_token
         )
         self._set_refresh_token_cookie(refresh_token, response)
+        logger.info(
+            "refresh_session success new_token=%s",
+            _refresh_token_log_label(refresh_token),
+        )
         return access_token
 
     def decode_access_token(self, access_token: str) -> TokenDataSchema:
@@ -479,18 +503,36 @@ class AuthAPI:
         self._set_refresh_token_cookie(refresh_token, response)
         return access_token
 
+    def clear_refresh_token_cookie(self, response: Response) -> None:
+        path = self.refresh_cookie_path()
+        response.delete_cookie(
+            "Refresh-Token",
+            path=path,
+            secure=self.settings.refresh_cookie_secure,
+            httponly=True,
+            samesite="none",
+        )
+        logger.info("clear_refresh_token_cookie path=%s", path)
+
     def _set_refresh_token_cookie(
         self, refresh_token: str, response: Response
     ) -> None:
+        path = self.refresh_cookie_path()
         response.set_cookie(
             "Refresh-Token",
             refresh_token,
             max_age=self.settings.refresh_ttl,
-            expires=self.settings.refresh_ttl,
             samesite="none",
-            secure=True,
+            secure=self.settings.refresh_cookie_secure,
             httponly=True,
-            path="/refresh-session",
+            path=path,
+        )
+        logger.info(
+            "set_refresh_token_cookie path=%s secure=%s max_age=%s token=%s",
+            path,
+            self.settings.refresh_cookie_secure,
+            self.settings.refresh_ttl,
+            _refresh_token_log_label(refresh_token),
         )
 
     async def _authorize_user(

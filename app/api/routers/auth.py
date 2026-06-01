@@ -87,12 +87,29 @@ async def refresh_token(
     BAD_TOKEN = HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Not valid refresh token.",
-        headers={
-            "set-cookie": "Refresh-Token=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/refresh-session"
-        },
     )
     token = request.cookies.get("Refresh-Token")
-    access_token = await auth_api.refresh_session(token, response=response)
+    logger.info(
+        "POST /refresh-session url_path=%s cookie_path=%s cookie_names=%s "
+        "refresh_token=%s",
+        request.url.path,
+        auth_api.refresh_cookie_path(),
+        list(request.cookies.keys()),
+        "present" if token else "missing",
+    )
+    if not token:
+        auth_api.clear_refresh_token_cookie(response)
+        raise BAD_TOKEN
+
+    try:
+        access_token = await auth_api.refresh_session(token, response=response)
+    except ValueError:
+        auth_api.clear_refresh_token_cookie(response)
+        raise BAD_TOKEN from None
+    except Exception:
+        logger.exception("POST /refresh-session failed")
+        auth_api.clear_refresh_token_cookie(response)
+        raise BAD_TOKEN from None
 
     return {"Access-Token": access_token}
 

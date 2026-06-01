@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Type
 
 from fastapi import Form
@@ -6,6 +6,7 @@ from inspect import Parameter, signature
 
 from pydantic import BaseModel, Field
 
+from app.schemas.api.delivery import OrderDeliveryAddressPayload
 from app.schemas.database import (
     AppTheme,
     ModerationStatus,
@@ -69,6 +70,9 @@ class SellerCardResponse(BaseModel):
     desc: str
     bannerImage: str | None
     avatarImage: str | None
+    tiktokUrl: str | None = None
+    telegramChannelUrl: str | None = None
+    vkUrl: str | None = None
     moderationStatus: ModerationStatus = ModerationStatus.APPROVED
     createdAt: datetime | None = None
 
@@ -144,6 +148,12 @@ class SellerProductResponse(ProductResponse):
     moderationStatus: ModerationStatus
     createdAt: datetime
     moderatorComment: str | None = None
+    deletionRequestStatus: ModerationStatus | None = None
+    deletionRequestReason: str | None = None
+
+
+class ProductDeletionRequestBody(BaseModel):
+    reason: str | None = None
 
 
 class ProductFacetCountItem(BaseModel):
@@ -230,6 +240,9 @@ class ModerationEditResponse(BaseModel):
     brandDescription: str | None = None
     avatarImage: str | None = None
     bannerImage: str | None = None
+    tiktokUrl: str | None = None
+    telegramChannelUrl: str | None = None
+    vkUrl: str | None = None
     actionType: str | None = None
 
 
@@ -274,11 +287,83 @@ class UserOrderResponse(BaseModel):
     delivery_cost: int
     total: int
     created_at: datetime
+    delivery_date: date | None = None
+    delivery_address_text: str | None = None
+    delivery_flat: str | None = None
+    cdek_pvz_code: str | None = None
+    cdek_pvz_address: str | None = None
+    payment_confirmation_url: str | None = None
     items: list[OrderLineItemResponse]
+
+
+class CancelProviderResult(BaseModel):
+    status: str
+    message: str | None = None
+
+
+class CancelOrderResponse(BaseModel):
+    order: UserOrderResponse
+    cdek: CancelProviderResult
+    payment: CancelProviderResult
 
 
 class OrdersListResponse(BaseModel):
     items: list[UserOrderResponse]
+
+
+class ModeratorOrderCustomerResponse(BaseModel):
+    id: int
+    username: str
+    full_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+
+
+class ModeratorOrderListItemResponse(UserOrderResponse):
+    customer: ModeratorOrderCustomerResponse
+
+
+class ModeratorOrderDetailResponse(ModeratorOrderListItemResponse):
+    cdek_order_uuid: str | None = None
+    cdek_error: str | None = None
+    yookassa_payment_id: str | None = None
+
+
+class ModeratorOrdersListResponse(BaseModel):
+    items: list[ModeratorOrderListItemResponse]
+    total: int
+
+
+class ModeratorOrderStatusUpdateRequest(BaseModel):
+    status: OrderStatus
+
+
+class CheckoutPaymentInitResponse(BaseModel):
+    checkout_id: int
+    payment_confirmation_url: str
+    total: int
+    already_paid: bool = False
+    order: UserOrderResponse | None = None
+
+
+class CheckoutCompleteResponse(BaseModel):
+    status: str
+    order: UserOrderResponse | None = None
+    message: str | None = None
+
+
+class PendingPaymentSyncItem(BaseModel):
+    checkout_id: int
+    status: str
+    cart_fingerprint: str | None = None
+    order_id: int | None = None
+    product_ids: list[int] = []
+    order: UserOrderResponse | None = None
+    payment_confirmation_url: str | None = None
+
+
+class SyncPendingPaymentsResponse(BaseModel):
+    items: list[PendingPaymentSyncItem]
 
 
 class ReviewResponse(BaseModel):
@@ -297,6 +382,13 @@ class AdvertBannerResponse(BaseModel):
     image: str
     href: str
     title: str
+
+
+class FaqItemResponse(BaseModel):
+    id: int
+    question: str
+    answer: str
+    sortOrder: int = 0
 
 
 class UserProfileUpdateRequest(BaseModel):
@@ -351,7 +443,10 @@ class OrderCreateRequest(BaseModel):
     payment_method: PaymentMethod
     delivery_method: DeliveryMethod
     delivery_cost: int = Field(default=0, ge=0)
+    delivery_date: date | None = None
+    address: OrderDeliveryAddressPayload | None = None
     items: list[OrderCreateItemRequest] = Field(..., min_length=1)
+    checkout_session_id: str | None = Field(default=None, max_length=64)
 
 
 class FavouriteProductRequest(BaseModel):

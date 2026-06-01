@@ -178,6 +178,20 @@ class AdvertBannerUpdateForm(BaseModel):
     text: str
 
 
+class FaqItemCreateRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    answer: str = Field(min_length=1)
+
+
+class FaqItemUpdateRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    answer: str = Field(min_length=1)
+
+
+class FaqItemReorderRequest(BaseModel):
+    ordered_ids: list[int] = Field(min_length=1)
+
+
 class SellerCardCreateRequest(BaseModel):
     name: str
     desc: str
@@ -187,6 +201,9 @@ class SellerCardCreateRequest(BaseModel):
 
 class SellerCardCreateForm(SellerCardCreateRequest):
     user_id: int
+    tiktok_url: str | None = None
+    telegram_channel_url: str | None = None
+    vk_url: str | None = None
 
 
 class SellerCardUpdateForm(BaseModel):
@@ -194,6 +211,9 @@ class SellerCardUpdateForm(BaseModel):
     desc: str
     banner_image: UploadFile | None = None
     avatar_image: UploadFile | None = None
+    tiktok_url: str | None = None
+    telegram_channel_url: str | None = None
+    vk_url: str | None = None
 
 
 # class AdvertBannerUpdateForm(BaseModel):

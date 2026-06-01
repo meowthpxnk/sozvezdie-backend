@@ -9,9 +9,13 @@ from app.schemas.api.responses import (
     ModerationDecisionRequest,
     ModerationEditResponse,
     ModerationProposalResponse,
+    ModeratorOrderDetailResponse,
+    ModeratorOrderStatusUpdateRequest,
+    ModeratorOrdersListResponse,
     SellerProductResponse,
 )
-from app.schemas.database import ModerationStatus
+from app.schemas.database import ModerationStatus, OrderStatus
+from app.services.order import OrderService
 from app.schemas.schemas import ProductImageSlotForm, ProductUpdateForm, SellerCardUpdateForm
 from app.services.moderation import ModerationService
 from app.services.product import ProductService
@@ -133,6 +137,9 @@ async def update_moderation_proposal_brand(
     desc: str = Form(...),
     banner_image: UploadFile | None = File(default=None),
     avatar_image: UploadFile | None = File(default=None),
+    tiktok_url: str = Form(default=""),
+    telegram_channel_url: str = Form(default=""),
+    vk_url: str = Form(default=""),
 ) -> ModerationEditResponse:
     from app.core import media_client
 
@@ -146,6 +153,9 @@ async def update_moderation_proposal_brand(
                 desc=desc,
                 banner_image=banner_image,
                 avatar_image=avatar_image,
+                tiktok_url=tiktok_url,
+                telegram_channel_url=telegram_channel_url,
+                vk_url=vk_url,
             ),
             media_client,
         )
@@ -270,6 +280,9 @@ async def update_moderator_catalog_brand(
     comment: str | None = Form(default=None),
     banner_image: UploadFile | None = File(default=None),
     avatar_image: UploadFile | None = File(default=None),
+    tiktok_url: str = Form(default=""),
+    telegram_channel_url: str = Form(default=""),
+    vk_url: str = Form(default=""),
 ) -> ModerationEditResponse:
     from app.core import media_client
 
@@ -283,12 +296,71 @@ async def update_moderator_catalog_brand(
                 desc=desc,
                 banner_image=banner_image,
                 avatar_image=avatar_image,
+                tiktok_url=tiktok_url,
+                telegram_channel_url=telegram_channel_url,
+                vk_url=vk_url,
             ),
             media_client,
             moderator_id=moderator.id,
             comment=comment,
         )
         return await ModerationService(session).get_catalog_brand_edit(seller_card_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/orders")
+async def list_moderation_orders(
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+    status_filter: OrderStatus | None = Query(default=None, alias="status"),
+    archive: bool = Query(default=False),
+    search: str | None = Query(default=None, min_length=1, max_length=120),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> ModeratorOrdersListResponse:
+    await require_moderation_access(token, session)
+    return await OrderService(session).list_orders_for_moderation(
+        status_filter=status_filter,
+        archive=archive,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/orders/{order_id}")
+async def get_moderation_order(
+    order_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+) -> ModeratorOrderDetailResponse:
+    await require_moderation_access(token, session)
+    try:
+        return await OrderService(session).get_order_for_moderation(order_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.patch("/orders/{order_id}/status")
+async def update_moderation_order_status(
+    order_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+    data: ModeratorOrderStatusUpdateRequest,
+) -> ModeratorOrderDetailResponse:
+    await require_moderation_access(token, session)
+    try:
+        return await OrderService(session).update_order_status_for_moderation(
+            order_id,
+            data.status,
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

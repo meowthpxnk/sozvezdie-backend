@@ -13,8 +13,11 @@ services:
         depends_on:
             - redis
             - postgres
+            - rabbitmq
         env_file:
             - .test.env
+        environment:
+            - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
         networks:
             - nginx_appnet
         # networks:
@@ -51,6 +54,37 @@ services:
             - "4002:5432"
         volumes:
             - postgres_data:/var/lib/postgresql/data
+        restart: unless-stopped
+        networks:
+            - nginx_appnet
+
+    rabbitmq:
+        container_name: sozvezdie-rabbitmq
+        image: rabbitmq:3-management-alpine
+        ports:
+            - "4005:5672"
+            - "4006:15672"
+        environment:
+            RABBITMQ_DEFAULT_USER: guest
+            RABBITMQ_DEFAULT_PASS: guest
+        restart: unless-stopped
+        networks:
+            - nginx_appnet
+
+    worker:
+        container_name: sozvezdie-worker
+        profiles: ["prod"]
+        build:
+            context: .
+            dockerfile: Dockerfile
+        depends_on:
+            - postgres
+            - rabbitmq
+        env_file:
+            - .test.env
+        environment:
+            - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+        entrypoint: bash -lc "alembic upgrade head && python -m app.workers.integration_worker"
         restart: unless-stopped
         networks:
             - nginx_appnet

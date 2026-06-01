@@ -42,12 +42,15 @@ class ProductService:
     def _facets_response(
         total: int, counts: dict[str, int]
     ) -> ProductFacetsResponse:
+        positive_counts = {
+            slug: count for slug, count in counts.items() if count > 0
+        }
         return ProductFacetsResponse(
-            total=total,
+            total=max(total, 0),
             items=[
                 ProductFacetCountItem(slug=slug, count=count)
                 for slug, count in sorted(
-                    counts.items(), key=lambda item: item[0]
+                    positive_counts.items(), key=lambda item: item[0]
                 )
             ],
         )
@@ -136,18 +139,6 @@ class ProductService:
         self.repo.add(product)
         await self.session.commit()
 
-        subcategory_slug_for_cache = None
-        if subcategory_id is not None and data.subcategory_slug:
-            subcategory_slug_for_cache = data.subcategory_slug
-
-        await self.facet_cache.apply_delta(
-            ProductFacetAttributes(
-                category_slug=category_slug,
-                subcategory_slug=subcategory_slug_for_cache,
-                fandom_slug=fandom_slug,
-            )
-        )
-
         return product
 
     async def get_seller_product_by_id(
@@ -175,6 +166,193 @@ class ProductService:
             raise HTTPException(status_code=404, detail="Product not found")
 
         return self._to_seller_response(product)
+
+    @staticmethod
+    def _product_facet_attributes(product: Product) -> ProductFacetAttributes:
+        subcategory_slug = (
+            product.subcategory.slug if product.subcategory else None
+        )
+        return ProductFacetAttributes(
+            category_slug=product.category_slug,
+            subcategory_slug=subcategory_slug,
+            fandom_slug=product.fandom_slug,
+        )
+
+    @staticmethod
+    def _is_catalog_visible(product: Product) -> bool:
+        if product.status != ModerationStatus.APPROVED:
+            return False
+        if product.deletion_request_status == ModerationStatus.PENDING:
+            return False
+        if product.inventory is None or product.inventory.quantity <= 0:
+            return False
+        return True
+
+    async def _apply_catalog_facet_change(
+        self,
+        previous: ProductFacetAttributes | None,
+        current: ProductFacetAttributes | None,
+    ) -> None:
+        if previous and current:
+            if previous != current:
+                await self.facet_cache.replace_attributes(previous, current)
+            return
+        if previous:
+            await self.facet_cache.apply_delta(previous, delta=-1)
+        if current:
+            await self.facet_cache.apply_delta(current, delta=1)
+
+    async def _sync_catalog_facet_after_change(
+        self,
+        product: Product,
+        *,
+        previous_attributes: ProductFacetAttributes | None,
+        was_visible: bool,
+    ) -> None:
+        is_visible = self._is_catalog_visible(product)
+        current_attributes = (
+            self._product_facet_attributes(product) if is_visible else None
+        )
+        previous = previous_attributes if was_visible else None
+        await self._apply_catalog_facet_change(previous, current_attributes)
+
+    async def _delete_product_record(self, product: Product) -> None:
+        was_visible = self._is_catalog_visible(product)
+        facet_attributes = (
+            self._product_facet_attributes(product) if was_visible else None
+        )
+        await self.repo.delete(product)
+        await self.session.commit()
+        if facet_attributes is not None:
+            await self.facet_cache.apply_delta(facet_attributes, delta=-1)
+
+    async def cancel_pending_product(self, user_id: int, product_id: int) -> None:
+        seller_card = await SellerCardRepository(self.session).get_by_user_id(
+            user_id
+        )
+        if seller_card is None:
+            raise ValueError("Seller card not found")
+
+        product = await self.repo.get_product(
+            ProductSpec(
+                id=product_id,
+                seller_card_id=str(seller_card.id),
+                approved_only=False,
+                include_subcategory=True,
+            )
+        )
+        if product is None:
+            raise ValueError("Product not found")
+        if product.status != ModerationStatus.PENDING:
+            raise ValueError("Only pending products can be cancelled")
+
+        await self._delete_product_record(product)
+
+    async def request_product_deletion(
+        self, user_id: int, product_id: int, reason: str | None = None
+    ) -> SellerProductResponse:
+        seller_card = await SellerCardRepository(self.session).get_by_user_id(
+            user_id
+        )
+        if seller_card is None:
+            raise ValueError("Seller card not found")
+
+        product = await self.repo.get_product(
+            ProductSpec(
+                id=product_id,
+                seller_card_id=str(seller_card.id),
+                approved_only=False,
+                include_inventory=True,
+                include_subcategory=True,
+                include_moderations=True,
+            )
+        )
+        if product is None:
+            raise ValueError("Product not found")
+        if product.status != ModerationStatus.APPROVED:
+            raise ValueError("Only approved products can be deleted")
+        if product.deletion_request_status == ModerationStatus.PENDING:
+            raise ValueError("Deletion request is already pending moderation")
+        if product.deletion_request_status == ModerationStatus.APPROVED:
+            raise ValueError("Product is already deleted")
+
+        from datetime import datetime
+
+        normalized_reason = reason.strip() if reason else None
+        if normalized_reason == "":
+            normalized_reason = None
+
+        was_visible = self._is_catalog_visible(product)
+        previous_attributes = (
+            self._product_facet_attributes(product) if was_visible else None
+        )
+
+        product.deletion_request_status = ModerationStatus.PENDING
+        product.deletion_request_reason = normalized_reason
+        product.deletion_requested_at = datetime.now()
+
+        await self.session.commit()
+        await self.session.refresh(product)
+        await self._sync_catalog_facet_after_change(
+            product,
+            previous_attributes=previous_attributes,
+            was_visible=was_visible,
+        )
+        return self._to_seller_response(product)
+
+    async def cancel_product_deletion_request(
+        self, user_id: int, product_id: int
+    ) -> SellerProductResponse:
+        seller_card = await SellerCardRepository(self.session).get_by_user_id(
+            user_id
+        )
+        if seller_card is None:
+            raise ValueError("Seller card not found")
+
+        product = await self.repo.get_product(
+            ProductSpec(
+                id=product_id,
+                seller_card_id=str(seller_card.id),
+                approved_only=False,
+                include_inventory=True,
+                include_subcategory=True,
+                include_moderations=True,
+            )
+        )
+        if product is None:
+            raise ValueError("Product not found")
+        if product.deletion_request_status != ModerationStatus.PENDING:
+            raise ValueError("Only pending deletion requests can be cancelled")
+
+        was_visible = self._is_catalog_visible(product)
+
+        product.deletion_request_status = None
+        product.deletion_request_reason = None
+        product.deletion_requested_at = None
+
+        await self.session.commit()
+        await self.session.refresh(product)
+        await self._sync_catalog_facet_after_change(
+            product,
+            previous_attributes=None,
+            was_visible=was_visible,
+        )
+        return self._to_seller_response(product)
+
+    async def delete_approved_product(self, product_id: int) -> None:
+        product = await self.repo.get_product(
+            ProductSpec(
+                id=product_id,
+                approved_only=False,
+                include_subcategory=True,
+            )
+        )
+        if product is None:
+            raise ValueError("Product not found")
+        if product.status != ModerationStatus.APPROVED:
+            raise ValueError("Product is not approved")
+
+        await self._delete_product_record(product)
 
     async def get_product_for_moderation(self, product_id: int) -> SellerProductResponse:
         product = await self.repo.get_product(
@@ -257,11 +435,35 @@ class ProductService:
         )
         if product is None:
             raise ValueError("Product not found")
+        if product.deletion_request_status == ModerationStatus.PENDING:
+            raise ValueError("Cannot edit product while deletion is pending moderation")
+
+        was_visible = self._is_catalog_visible(product)
+        previous_attributes = (
+            self._product_facet_attributes(product) if was_visible else None
+        )
 
         await self._apply_product_update(product, data, media_client)
         await self.session.commit()
-        await self.session.refresh(product)
-        return product
+
+        refreshed = await self.repo.get_product(
+            ProductSpec(
+                id=product_id,
+                seller_card_id=str(data.seller_card_id),
+                include_inventory=True,
+                include_subcategory=True,
+                approved_only=False,
+            )
+        )
+        if refreshed is None:
+            raise ValueError("Product not found")
+
+        await self._sync_catalog_facet_after_change(
+            refreshed,
+            previous_attributes=previous_attributes,
+            was_visible=was_visible,
+        )
+        return refreshed
 
     async def update_product_by_moderator(
         self,
@@ -287,6 +489,11 @@ class ProductService:
         if product.seller_card_id is None:
             raise ValueError("Product seller not found")
 
+        was_visible = self._is_catalog_visible(product)
+        previous_attributes = (
+            self._product_facet_attributes(product) if was_visible else None
+        )
+
         data.seller_card_id = product.seller_card_id
         await self._apply_product_update(
             product,
@@ -308,8 +515,24 @@ class ProductService:
             )
         )
         await self.session.commit()
-        await self.session.refresh(product)
-        return product
+
+        refreshed = await self.repo.get_product(
+            ProductSpec(
+                id=product_id,
+                include_inventory=True,
+                include_subcategory=True,
+                approved_only=False,
+            )
+        )
+        if refreshed is None:
+            raise ValueError("Product not found")
+
+        await self._sync_catalog_facet_after_change(
+            refreshed,
+            previous_attributes=previous_attributes,
+            was_visible=was_visible,
+        )
+        return refreshed
 
     async def _apply_product_update(
         self,
@@ -497,13 +720,37 @@ class ProductService:
         comment = latest.comment.strip()
         return comment or None
 
+    @staticmethod
+    def _latest_deletion_rejection_comment(product: Product) -> str | None:
+        if product.deletion_request_status != ModerationStatus.REJECTED:
+            return None
+        if not product.moderations:
+            return None
+
+        deletion_comments = [
+            moderation.comment.strip()
+            for moderation in product.moderations
+            if moderation.comment
+            and moderation.comment.startswith("Удаление товара:")
+        ]
+        if not deletion_comments:
+            return None
+
+        return deletion_comments[-1].removeprefix("Удаление товара:").strip() or None
+
     def _to_seller_response(self, product: Product) -> SellerProductResponse:
         response = self._to_response(product)
+        moderator_comment = self._latest_moderator_comment(product)
+        if moderator_comment is None:
+            moderator_comment = self._latest_deletion_rejection_comment(product)
+
         return SellerProductResponse(
             **response.model_dump(),
             moderationStatus=product.status,
             createdAt=product.created_at,
-            moderatorComment=self._latest_moderator_comment(product),
+            moderatorComment=moderator_comment,
+            deletionRequestStatus=product.deletion_request_status,
+            deletionRequestReason=product.deletion_request_reason,
         )
 
     async def get_products_for_seller_user(
@@ -541,8 +788,8 @@ class ProductService:
     async def get_category_facets(
         self, fandom_slug: str | None = None
     ) -> ProductFacetsResponse:
-        await self.facet_cache.ensure_initialized(self.session)
-        total, counts = await self.facet_cache.get_category_facets(fandom_slug)
+        total = await self.repo.count_catalog_products(fandom_slug=fandom_slug)
+        counts = await self.repo.count_catalog_by_category(fandom_slug)
         return self._facets_response(total, counts)
 
     async def get_subcategory_facets(
@@ -550,8 +797,11 @@ class ProductService:
         category_slug: str,
         fandom_slug: str | None = None,
     ) -> ProductFacetsResponse:
-        await self.facet_cache.ensure_initialized(self.session)
-        total, counts = await self.facet_cache.get_subcategory_facets(
+        total = await self.repo.count_catalog_products(
+            category_slug=category_slug,
+            fandom_slug=fandom_slug,
+        )
+        counts = await self.repo.count_catalog_by_subcategory(
             category_slug, fandom_slug
         )
         return self._facets_response(total, counts)
@@ -561,8 +811,12 @@ class ProductService:
         category_slug: str | None = None,
         subcategory_slug: str | None = None,
     ) -> ProductFacetsResponse:
-        await self.facet_cache.ensure_initialized(self.session)
-        total, counts = await self.facet_cache.get_fandom_facets(
-            category_slug, subcategory_slug
+        total = await self.repo.count_catalog_products(
+            category_slug=category_slug,
+            subcategory_slug=subcategory_slug,
+        )
+        counts = await self.repo.count_catalog_by_fandom(
+            category_slug=category_slug,
+            subcategory_slug=subcategory_slug,
         )
         return self._facets_response(total, counts)

@@ -32,6 +32,7 @@ class PaymentMethod(enum.Enum):
 
 
 class DeliveryMethod(enum.Enum):
+    SELF_PICKUP = "SELF_PICKUP"
     COURIER = "COURIER"
     PICKUP_POINT = "PICKUP_POINT"
     POST = "POST"

@@ -22,7 +22,10 @@ from app.schemas.schemas import (
     SellerCardCreateForm,
     SellerCardUpdateForm,
 )
-from app.schemas.api.responses import AuthorBrandModerationResponse
+from app.schemas.api.responses import (
+    AuthorBrandModerationResponse,
+    ProductDeletionRequestBody,
+)
 from app.services.product import ProductService
 from app.services.seller_card import SellerCardService
 from app.services.user import UserService
@@ -171,6 +174,137 @@ async def update_my_author_product(
     return await ProductService(session).get_seller_product_by_id(user.id, product_id)
 
 
+@router.post(
+    "/me/products/{product_id}/deletion-request",
+    name="request_my_product_deletion",
+)
+async def request_my_product_deletion(
+    product_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+    data: ProductDeletionRequestBody,
+) -> SellerProductResponse:
+    user = await UserService(session).get_user(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if user.role != UserRoleEnum.SELLER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    try:
+        return await ProductService(session).request_product_deletion(
+            user.id, product_id, data.reason
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.delete(
+    "/me/products/{product_id}/deletion-request",
+    name="cancel_my_product_deletion_request",
+)
+async def cancel_my_product_deletion_request(
+    product_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+) -> SellerProductResponse:
+    user = await UserService(session).get_user(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if user.role != UserRoleEnum.SELLER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    try:
+        return await ProductService(session).cancel_product_deletion_request(
+            user.id, product_id
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.delete(
+    "/me/products/{product_id}/moderation-request",
+    name="cancel_my_product_moderation_request",
+)
+async def cancel_my_product_moderation_request(
+    product_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+) -> Response:
+    user = await UserService(session).get_user(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if user.role != UserRoleEnum.SELLER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    try:
+        await ProductService(session).cancel_pending_product(user.id, product_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/me/brand-moderations/{moderation_id}",
+    name="cancel_my_brand_moderation_request",
+)
+async def cancel_my_brand_moderation_request(
+    moderation_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+) -> Response:
+    user = await UserService(session).get_user(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if user.role != UserRoleEnum.SELLER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    try:
+        await SellerCardService(session).cancel_brand_moderation(
+            user.id, moderation_id
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/me/brand-moderations", name="get_my_brand_moderations")
 async def get_my_brand_moderations(
     token: BearerAuthDepends,
@@ -199,6 +333,9 @@ async def update_my_author_brand(
     desc: str = Form(...),
     banner_image: UploadFile | None = File(default=None),
     avatar_image: UploadFile | None = File(default=None),
+    tiktok_url: str = Form(default=""),
+    telegram_channel_url: str = Form(default=""),
+    vk_url: str = Form(default=""),
 ) -> SellerCardResponse:
     from app.core import media_client
 
@@ -230,6 +367,9 @@ async def update_my_author_brand(
                 desc=desc,
                 banner_image=banner_image,
                 avatar_image=avatar_image,
+                tiktok_url=tiktok_url,
+                telegram_channel_url=telegram_channel_url,
+                vk_url=vk_url,
             ),
             media_client,
         )
@@ -300,6 +440,9 @@ async def create_author(
     desc: str = Form(...),
     banner_image: UploadFile = File(...),
     avatar_image: UploadFile = File(...),
+    tiktok_url: str = Form(default=""),
+    telegram_channel_url: str = Form(default=""),
+    vk_url: str = Form(default=""),
 ) -> SellerCardResponse:
     from app.core import media_client
 
@@ -330,6 +473,9 @@ async def create_author(
             desc=desc,
             banner_image=banner_image,
             avatar_image=avatar_image,
+            tiktok_url=tiktok_url,
+            telegram_channel_url=telegram_channel_url,
+            vk_url=vk_url,
         ),
         media_client,
     )

@@ -74,3 +74,21 @@ class SellerCardModerationRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_by_id_for_user(
+        self, moderation_id: int, user_id: int
+    ) -> SellerCardModeration | None:
+        stmt = (
+            select(SellerCardModeration)
+            .join(SellerCard)
+            .where(
+                SellerCardModeration.id == moderation_id,
+                SellerCard.user_id == user_id,
+            )
+            .options(
+                selectinload(SellerCardModeration.seller_card),
+                selectinload(SellerCardModeration.moderator),
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

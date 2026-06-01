@@ -34,6 +34,14 @@ class Product(Base, WithIDMixin):
         nullable=False,
         default=ModerationStatus.PENDING,
     )
+    deletion_request_status: Mapped[ModerationStatus | None] = mapped_column(
+        Enum(ModerationStatus, name="moderationstatus", create_type=False),
+        nullable=True,
+    )
+    deletion_request_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.now
     )

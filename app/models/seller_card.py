@@ -29,6 +29,9 @@ class SellerCard(Base, WithIDMixin):
     )
     banner_image: Mapped[str] = mapped_column(String, nullable=True)
     avatar_image: Mapped[str] = mapped_column(String, nullable=True)
+    tiktok_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    telegram_channel_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    vk_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="seller_card")
     moderations: Mapped[list["SellerCardModeration"]] = relationship(

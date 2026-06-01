@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         SellerCardModeration,
         FavouriteProduct,
         FavouriteAuthor,
+        UserAddress,
     )
 
 
@@ -59,6 +60,10 @@ class User(Base, WithIDMixin):
         cascade="all, delete-orphan",
     )
     favourite_authors: Mapped[list["FavouriteAuthor"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    addresses: Mapped[list["UserAddress"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

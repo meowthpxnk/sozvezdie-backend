@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.product import ProductRepository
 
-CACHE_PREFIX = "catalog:facets"
+CACHE_PREFIX = "catalog:facets:v2"
 KEY_TOTAL = f"{CACHE_PREFIX}:total"
 KEY_BY_CATEGORY = f"{CACHE_PREFIX}:by_category"
 KEY_BY_FANDOM = f"{CACHE_PREFIX}:by_fandom"

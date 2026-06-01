@@ -44,6 +44,11 @@ class SellerCardModeration(Base, WithIDMixin):
     proposed_desc: Mapped[str] = mapped_column(String, nullable=False)
     proposed_banner_image: Mapped[str | None] = mapped_column(String, nullable=True)
     proposed_avatar_image: Mapped[str | None] = mapped_column(String, nullable=True)
+    proposed_tiktok_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    proposed_telegram_channel_url: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
+    proposed_vk_url: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.now
     )

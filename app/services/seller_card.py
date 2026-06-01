@@ -14,6 +14,7 @@ from app.schemas.api.responses import (
     SellerCardResponse,
 )
 from app.schemas.database import ModerationStatus
+from app.utils.social_url import normalize_optional_url
 
 
 class SellerCardService:
@@ -22,6 +23,12 @@ class SellerCardService:
         self.repo = SellerCardRepository(session)
         self.product_repo = ProductRepository(session)
         self.moderation_repo = SellerCardModerationRepository(session)
+
+    @staticmethod
+    def _resolve_social_url(value: str | None, current: str | None) -> str | None:
+        if value is None:
+            return current
+        return normalize_optional_url(value)
 
     async def get_all(self) -> list[SellerCardResponse]:
         seller_cards = await self.repo.get_all()
@@ -38,6 +45,9 @@ class SellerCardService:
             desc=seller_card.desc,
             bannerImage=seller_card.banner_image,
             avatarImage=seller_card.avatar_image,
+            tiktokUrl=seller_card.tiktok_url,
+            telegramChannelUrl=seller_card.telegram_channel_url,
+            vkUrl=seller_card.vk_url,
             moderationStatus=seller_card.status,
             createdAt=seller_card.created_at,
         )
@@ -138,6 +148,9 @@ class SellerCardService:
         desc: str,
         banner_image: str | None,
         avatar_image: str | None,
+        tiktok_url: str | None = None,
+        telegram_channel_url: str | None = None,
+        vk_url: str | None = None,
     ) -> SellerCardModeration:
         moderation = SellerCardModeration(
             seller_card_id=seller_card.id,
@@ -147,6 +160,9 @@ class SellerCardService:
             proposed_desc=desc,
             proposed_banner_image=banner_image,
             proposed_avatar_image=avatar_image,
+            proposed_tiktok_url=tiktok_url,
+            proposed_telegram_channel_url=telegram_channel_url,
+            proposed_vk_url=vk_url,
         )
         self.moderation_repo.add(moderation)
         return moderation
@@ -159,6 +175,9 @@ class SellerCardService:
             name=data.name,
             desc=data.desc,
             status=ModerationStatus.PENDING,
+            tiktok_url=normalize_optional_url(data.tiktok_url),
+            telegram_channel_url=normalize_optional_url(data.telegram_channel_url),
+            vk_url=normalize_optional_url(data.vk_url),
         )
         content = await data.banner_image.read()
         content_type = data.banner_image.content_type or "image/jpeg"
@@ -183,6 +202,9 @@ class SellerCardService:
             desc=card.desc,
             banner_image=card.banner_image,
             avatar_image=card.avatar_image,
+            tiktok_url=card.tiktok_url,
+            telegram_channel_url=card.telegram_channel_url,
+            vk_url=card.vk_url,
         )
 
         await self.session.commit()
@@ -214,6 +236,13 @@ class SellerCardService:
             media_client,
             seller_card.avatar_image,
         )
+        proposed_tiktok = self._resolve_social_url(
+            data.tiktok_url, seller_card.tiktok_url
+        )
+        proposed_telegram = self._resolve_social_url(
+            data.telegram_channel_url, seller_card.telegram_channel_url
+        )
+        proposed_vk = self._resolve_social_url(data.vk_url, seller_card.vk_url)
 
         if seller_card.status == ModerationStatus.APPROVED:
             pending_moderation = await self.moderation_repo.get_pending_for_seller_card(
@@ -229,6 +258,9 @@ class SellerCardService:
                 desc=proposed_desc,
                 banner_image=proposed_banner,
                 avatar_image=proposed_avatar,
+                tiktok_url=proposed_tiktok,
+                telegram_channel_url=proposed_telegram,
+                vk_url=proposed_vk,
             )
             await self.session.commit()
             await self.session.refresh(seller_card)
@@ -238,6 +270,9 @@ class SellerCardService:
         seller_card.desc = proposed_desc
         seller_card.banner_image = proposed_banner
         seller_card.avatar_image = proposed_avatar
+        seller_card.tiktok_url = proposed_tiktok
+        seller_card.telegram_channel_url = proposed_telegram
+        seller_card.vk_url = proposed_vk
         seller_card.status = ModerationStatus.PENDING
 
         pending_moderation = await self.moderation_repo.get_pending_for_seller_card(
@@ -251,12 +286,18 @@ class SellerCardService:
                 desc=proposed_desc,
                 banner_image=proposed_banner,
                 avatar_image=proposed_avatar,
+                tiktok_url=proposed_tiktok,
+                telegram_channel_url=proposed_telegram,
+                vk_url=proposed_vk,
             )
         else:
             pending_moderation.proposed_name = proposed_name
             pending_moderation.proposed_desc = proposed_desc
             pending_moderation.proposed_banner_image = proposed_banner
             pending_moderation.proposed_avatar_image = proposed_avatar
+            pending_moderation.proposed_tiktok_url = proposed_tiktok
+            pending_moderation.proposed_telegram_channel_url = proposed_telegram
+            pending_moderation.proposed_vk_url = proposed_vk
             pending_moderation.status = ModerationStatus.PENDING
             pending_moderation.moderator_id = None
             pending_moderation.comment = None
@@ -304,6 +345,13 @@ class SellerCardService:
             media_client,
             seller_card.avatar_image,
         )
+        proposed_tiktok = self._resolve_social_url(
+            data.tiktok_url, seller_card.tiktok_url
+        )
+        proposed_telegram = self._resolve_social_url(
+            data.telegram_channel_url, seller_card.telegram_channel_url
+        )
+        proposed_vk = self._resolve_social_url(data.vk_url, seller_card.vk_url)
 
         moderation_comment = (comment or "Изменение применено модератором.").strip()
         if not moderation_comment:
@@ -319,6 +367,9 @@ class SellerCardService:
             proposed_desc=proposed_desc,
             proposed_banner_image=proposed_banner,
             proposed_avatar_image=proposed_avatar,
+            proposed_tiktok_url=proposed_tiktok,
+            proposed_telegram_channel_url=proposed_telegram,
+            proposed_vk_url=proposed_vk,
         )
         self.moderation_repo.add(moderation)
 
@@ -326,10 +377,35 @@ class SellerCardService:
         seller_card.desc = proposed_desc
         seller_card.banner_image = proposed_banner
         seller_card.avatar_image = proposed_avatar
+        seller_card.tiktok_url = proposed_tiktok
+        seller_card.telegram_channel_url = proposed_telegram
+        seller_card.vk_url = proposed_vk
 
         await self.session.commit()
         await self.session.refresh(seller_card)
         return seller_card
+
+    async def cancel_brand_moderation(self, user_id: int, moderation_id: int) -> None:
+        moderation = await self.moderation_repo.get_by_id_for_user(
+            moderation_id, user_id
+        )
+        if moderation is None:
+            raise ValueError("Brand moderation not found")
+        if moderation.status != ModerationStatus.PENDING:
+            raise ValueError("Only pending moderation requests can be cancelled")
+
+        if moderation.action_type == SellerCardModerationAction.CREATE_SHOP:
+            seller_card = moderation.seller_card
+            if seller_card.status not in {
+                ModerationStatus.PENDING,
+                ModerationStatus.REJECTED,
+            }:
+                raise ValueError("Shop creation request is no longer pending")
+            await self.session.delete(seller_card)
+        else:
+            await self.session.delete(moderation)
+
+        await self.session.commit()
 
     async def get_brand_moderations_for_user(
         self, user_id: int

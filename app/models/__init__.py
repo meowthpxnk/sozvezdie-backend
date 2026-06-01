@@ -5,6 +5,8 @@ from .cart import Cart
 from .inventory import Inventory
 from .order_item import OrderItem
 from .order import Order
+from .checkout_payment import CheckoutPayment, CheckoutPaymentStatus
+from .user_address import UserAddress
 from .product_alternatives import ProductAlternative
 from .product_image import ProductImage
 from .product_moderation import ProductModeration
@@ -19,3 +21,5 @@ from .user_settings import UserSettings
 from .user import User
 from .vk_id_mapping import VkIdMapping
 from .advert_banner import AdvertBanner
+from .faq_item import FaqItem
+from .integration_task import IntegrationTask

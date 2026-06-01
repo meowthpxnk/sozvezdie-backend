@@ -1,4 +1,4 @@
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -119,7 +119,7 @@ class ProductRepository:
         if fandom_slug:
             stmt = stmt.where(Product.fandom_slug == fandom_slug)
 
-        stmt = self._apply_approved_filter(stmt)
+        stmt = self._apply_catalog_filter(stmt)
 
         options = [
             selectinload(Product.images),
@@ -133,7 +133,46 @@ class ProductRepository:
 
     @staticmethod
     def _apply_approved_filter(stmt):
-        return stmt.where(Product.status == ModerationStatus.APPROVED)
+        return stmt.where(
+            Product.status == ModerationStatus.APPROVED,
+            or_(
+                Product.deletion_request_status.is_(None),
+                Product.deletion_request_status != ModerationStatus.PENDING,
+            ),
+        )
+
+    @classmethod
+    def _apply_catalog_filter(cls, stmt, *, inventory_joined: bool = False):
+        stmt = cls._apply_approved_filter(stmt)
+        if inventory_joined:
+            return stmt.where(Inventory.quantity > 0)
+        return stmt.join(Inventory, Product.inventory).where(Inventory.quantity > 0)
+
+    async def list_deletion_requests_for_moderation(
+        self, status: ModerationStatus | None = None
+    ) -> list[Product]:
+        stmt = (
+            select(Product)
+            .where(
+                Product.status == ModerationStatus.APPROVED,
+                Product.deletion_request_status.is_not(None),
+            )
+            .order_by(Product.deletion_requested_at.desc())
+        )
+        if status is not None:
+            stmt = stmt.where(Product.deletion_request_status == status)
+
+        stmt = stmt.options(
+            selectinload(Product.images),
+            selectinload(Product.inventory),
+            selectinload(Product.seller_card).selectinload(SellerCard.user),
+            selectinload(Product.subcategory),
+            selectinload(Product.moderations).selectinload(
+                ProductModeration.moderator
+            ),
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
 
     def _product_list_options(self):
         return [
@@ -197,7 +236,7 @@ class ProductRepository:
     ) -> list[Product]:
         pool_limit = max(1, min(pool_limit, 100))
         stmt = select(Product)
-        stmt = self._apply_approved_filter(stmt)
+        stmt = self._apply_catalog_filter(stmt)
         stmt = stmt.where(Product.id != product_id)
 
         conditions = []
@@ -231,7 +270,10 @@ class ProductRepository:
         starts_with: str | None = None,
     ) -> tuple[list[Product], bool]:
         limit = max(1, min(limit, 100))
+        inventory_joined = sort == "popular"
         stmt = select(Product)
+        if inventory_joined:
+            stmt = stmt.join(Inventory, Product.inventory)
         stmt = self._apply_product_filters(
             stmt,
             category_slug=category_slug,
@@ -239,10 +281,7 @@ class ProductRepository:
             fandom_slug=fandom_slug,
         )
         stmt = self._apply_starts_with_filter(stmt, starts_with)
-        stmt = self._apply_approved_filter(stmt)
-
-        if sort == "popular":
-            stmt = stmt.join(Inventory, Product.inventory)
+        stmt = self._apply_catalog_filter(stmt, inventory_joined=inventory_joined)
 
         if after_id is not None:
             if sort in {"newest", "oldest"}:
@@ -339,15 +378,118 @@ class ProductRepository:
 
         return products, has_more
 
+    def _catalog_count_base(self):
+        return (
+            select(func.count(Product.id))
+            .select_from(Product)
+            .join(Inventory, Product.inventory)
+        )
+
+    async def count_catalog_products(
+        self,
+        *,
+        category_slug: str | None = None,
+        subcategory_slug: str | None = None,
+        fandom_slug: str | None = None,
+    ) -> int:
+        stmt = self._catalog_count_base()
+        stmt = self._apply_product_filters(
+            stmt,
+            category_slug=category_slug,
+            subcategory_slug=subcategory_slug,
+            fandom_slug=fandom_slug,
+        )
+        stmt = self._apply_catalog_filter(stmt, inventory_joined=True)
+        result = await self.session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    async def count_catalog_by_category(
+        self, fandom_slug: str | None = None
+    ) -> dict[str, int]:
+        stmt = (
+            select(Product.category_slug, func.count(Product.id))
+            .select_from(Product)
+            .join(Inventory, Product.inventory)
+            .where(Product.category_slug.is_not(None))
+        )
+        stmt = self._apply_product_filters(
+            stmt,
+            category_slug=None,
+            subcategory_slug=None,
+            fandom_slug=fandom_slug,
+        )
+        stmt = self._apply_catalog_filter(stmt, inventory_joined=True)
+        stmt = stmt.group_by(Product.category_slug)
+        result = await self.session.execute(stmt)
+        return {
+            slug: int(count)
+            for slug, count in result.all()
+            if slug is not None
+        }
+
+    async def count_catalog_by_subcategory(
+        self,
+        category_slug: str,
+        fandom_slug: str | None = None,
+    ) -> dict[str, int]:
+        stmt = (
+            select(Subcategory.slug, func.count(Product.id))
+            .select_from(Product)
+            .join(Inventory, Product.inventory)
+            .join(Subcategory, Product.subcategory_id == Subcategory.id)
+            .where(
+                Product.category_slug == category_slug,
+                Subcategory.category_slug == category_slug,
+            )
+        )
+        if fandom_slug:
+            stmt = stmt.where(Product.fandom_slug == fandom_slug)
+        stmt = self._apply_catalog_filter(stmt, inventory_joined=True)
+        stmt = stmt.group_by(Subcategory.slug)
+        result = await self.session.execute(stmt)
+        return {slug: int(count) for slug, count in result.all() if slug is not None}
+
+    async def count_catalog_by_fandom(
+        self,
+        *,
+        category_slug: str | None = None,
+        subcategory_slug: str | None = None,
+    ) -> dict[str, int]:
+        stmt = (
+            select(Product.fandom_slug, func.count(Product.id))
+            .select_from(Product)
+            .join(Inventory, Product.inventory)
+            .where(Product.fandom_slug.is_not(None))
+        )
+        stmt = self._apply_product_filters(
+            stmt,
+            category_slug=category_slug,
+            subcategory_slug=subcategory_slug,
+            fandom_slug=None,
+        )
+        stmt = self._apply_catalog_filter(stmt, inventory_joined=True)
+        stmt = stmt.group_by(Product.fandom_slug)
+        result = await self.session.execute(stmt)
+        return {
+            slug: int(count)
+            for slug, count in result.all()
+            if slug is not None
+        }
+
     async def get_facet_source_rows(
         self,
     ) -> list[tuple[str | None, str | None, str | None]]:
-        stmt = select(
-            Product.category_slug,
-            Subcategory.slug,
-            Product.fandom_slug,
-        ).outerjoin(Subcategory, Product.subcategory_id == Subcategory.id)
-        stmt = self._apply_approved_filter(stmt)
+        stmt = (
+            select(
+                Product.category_slug,
+                Subcategory.slug,
+                Product.fandom_slug,
+            )
+            .select_from(Product)
+            .join(Inventory, Product.inventory)
+            .outerjoin(Subcategory, Product.subcategory_id == Subcategory.id)
+        )
+        stmt = self._apply_catalog_filter(stmt, inventory_joined=True)
         result = await self.session.execute(stmt)
         return [
             (category_slug, subcategory_slug, fandom_slug)

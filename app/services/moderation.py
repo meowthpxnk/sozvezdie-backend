@@ -37,6 +37,7 @@ def _format_rubles(price_kopecks: int) -> str:
 
 class ModerationService:
     PRODUCT_PREFIX = "product"
+    PRODUCT_DELETE_PREFIX = "product-delete"
     BRAND_PREFIX = "brand"
     PRODUCT_EDIT_PREFIX = "product-edit"
     _DECISION_COMMENTS = {
@@ -51,6 +52,26 @@ class ModerationService:
 
     @staticmethod
     def parse_proposal_id(proposal_id: str) -> tuple[str, int]:
+        if proposal_id.startswith(
+            f"{ModerationService.PRODUCT_DELETE_PREFIX}-"
+        ):
+            return (
+                ModerationService.PRODUCT_DELETE_PREFIX,
+                int(
+                    proposal_id.removeprefix(
+                        f"{ModerationService.PRODUCT_DELETE_PREFIX}-"
+                    )
+                ),
+            )
+        if proposal_id.startswith(f"{ModerationService.PRODUCT_EDIT_PREFIX}-"):
+            return (
+                ModerationService.PRODUCT_EDIT_PREFIX,
+                int(
+                    proposal_id.removeprefix(
+                        f"{ModerationService.PRODUCT_EDIT_PREFIX}-"
+                    )
+                ),
+            )
         if proposal_id.startswith(f"{ModerationService.PRODUCT_PREFIX}-"):
             return (
                 ModerationService.PRODUCT_PREFIX,
@@ -204,7 +225,103 @@ class ModerationService:
                     )
                 )
 
+        self._append_social_changes(
+            changes,
+            seller_card,
+            moderation,
+            is_update=moderation.action_type == SellerCardModerationAction.UPDATE_BRAND,
+        )
+
         return changes
+
+    def _append_social_changes(
+        self,
+        changes: list,
+        seller_card: SellerCard,
+        moderation: SellerCardModeration,
+        *,
+        is_update: bool,
+    ) -> None:
+        social_fields = (
+            ("TikTok", "tiktok_url", "proposed_tiktok_url"),
+            ("Telegram-канал", "telegram_channel_url", "proposed_telegram_channel_url"),
+            ("ВКонтакте", "vk_url", "proposed_vk_url"),
+        )
+        for label, current_attr, proposed_attr in social_fields:
+            before = getattr(seller_card, current_attr) if is_update else None
+            after = getattr(moderation, proposed_attr)
+            before_display = before or "—"
+            after_display = after or "—"
+            if not is_update and not after:
+                continue
+            if is_update and before == after:
+                continue
+            changes.append(
+                ModerationFieldDiffResponse(
+                    label=label,
+                    before=before_display,
+                    after=after_display,
+                )
+            )
+
+    def _build_product_deletion_changes(
+        self, product: Product
+    ) -> list[ModerationFieldDiffResponse]:
+        reason = product.deletion_request_reason or "Не указана"
+        return [
+            ModerationFieldDiffResponse(
+                label="Статус товара",
+                before="Активен",
+                after="Удалён",
+            ),
+            ModerationFieldDiffResponse(
+                label="Причина удаления",
+                before="—",
+                after=reason,
+            ),
+        ]
+
+    def _product_deletion_to_proposal(
+        self, product: Product
+    ) -> ModerationProposalResponse:
+        seller_card = product.seller_card
+        seller_user = seller_card.user if seller_card else None
+        submitted_by = seller_card.name if seller_card else "Неизвестный автор"
+        if seller_user:
+            submitted_by = f"{submitted_by} (@{seller_user.username})"
+
+        moderated_by = None
+        moderation_comment = None
+        if product.deletion_request_status != ModerationStatus.PENDING:
+            deletion_moderations = [
+                moderation
+                for moderation in product.moderations
+                if moderation.comment
+                and moderation.comment.startswith("Удаление товара:")
+            ]
+            if deletion_moderations:
+                latest = max(
+                    deletion_moderations, key=lambda moderation: moderation.created_at
+                )
+                moderated_by = f"@{latest.moderator.username}"
+                moderation_comment = latest.comment.removeprefix(
+                    "Удаление товара:"
+                ).strip()
+
+        cover_uuid = product.images[0].image_uuid if product.images else None
+
+        return ModerationProposalResponse(
+            id=f"{self.PRODUCT_DELETE_PREFIX}-{product.id}",
+            createdAt=product.deletion_requested_at or product.created_at,
+            title=f"Удаление товара «{product.name}»",
+            type="DELETE_PRODUCT",
+            status=product.deletion_request_status or ModerationStatus.PENDING,
+            submittedBy=submitted_by,
+            moderatedBy=moderated_by,
+            moderationComment=moderation_comment,
+            previewImageUrl=str(cover_uuid) if cover_uuid else None,
+            changes=self._build_product_deletion_changes(product),
+        )
 
     def _product_to_proposal(
         self, product: Product
@@ -320,6 +437,14 @@ class ModerationService:
             for moderation in brand_moderations
         )
 
+        deletion_products = (
+            await self.product_repo.list_deletion_requests_for_moderation(status)
+        )
+        proposals.extend(
+            self._product_deletion_to_proposal(product)
+            for product in deletion_products
+        )
+
         if status in {None, ModerationStatus.APPROVED}:
             product_moderations = (
                 await self.product_repo.list_product_moderations_for_feed(status)
@@ -390,6 +515,9 @@ class ModerationService:
             brandDescription=seller_card.desc,
             avatarImage=seller_card.avatar_image,
             bannerImage=seller_card.banner_image,
+            tiktokUrl=seller_card.tiktok_url,
+            telegramChannelUrl=seller_card.telegram_channel_url,
+            vkUrl=seller_card.vk_url,
             actionType=SellerCardModerationAction.UPDATE_BRAND.value,
         )
 
@@ -397,6 +525,34 @@ class ModerationService:
         self, proposal_id: str
     ) -> ModerationEditResponse:
         entity_type, entity_id = self.parse_proposal_id(proposal_id)
+
+        if entity_type == self.PRODUCT_DELETE_PREFIX:
+            product = await self.product_repo.get_product(
+                ProductSpec(
+                    id=entity_id,
+                    include_images=True,
+                    include_inventory=True,
+                    include_seller_card=True,
+                    include_subcategory=True,
+                    include_moderations=True,
+                    approved_only=False,
+                )
+            )
+            if product is None:
+                raise ValueError("Product not found")
+            if product.deletion_request_status != ModerationStatus.PENDING:
+                raise ValueError("Product deletion is not pending moderation")
+
+            from app.services.product import ProductService
+
+            product_response = ProductService(self.session)._to_seller_response(
+                product
+            )
+            return ModerationEditResponse(
+                kind="product",
+                proposal=self._product_deletion_to_proposal(product),
+                product=product_response,
+            )
 
         if entity_type == self.PRODUCT_PREFIX:
             product = await self.product_repo.get_product(
@@ -439,6 +595,9 @@ class ModerationService:
             brandDescription=moderation.proposed_desc,
             avatarImage=moderation.proposed_avatar_image,
             bannerImage=moderation.proposed_banner_image,
+            tiktokUrl=moderation.proposed_tiktok_url,
+            telegramChannelUrl=moderation.proposed_telegram_channel_url,
+            vkUrl=moderation.proposed_vk_url,
             actionType=moderation.action_type.value,
         )
 
@@ -485,6 +644,24 @@ class ModerationService:
                 fallback_avatar,
             )
         )
+        moderation.proposed_tiktok_url = seller_card_service._resolve_social_url(
+            data.tiktok_url,
+            moderation.proposed_tiktok_url
+            if moderation.proposed_tiktok_url is not None
+            else (seller_card.tiktok_url if seller_card else None),
+        )
+        moderation.proposed_telegram_channel_url = seller_card_service._resolve_social_url(
+            data.telegram_channel_url,
+            moderation.proposed_telegram_channel_url
+            if moderation.proposed_telegram_channel_url is not None
+            else (seller_card.telegram_channel_url if seller_card else None),
+        )
+        moderation.proposed_vk_url = seller_card_service._resolve_social_url(
+            data.vk_url,
+            moderation.proposed_vk_url
+            if moderation.proposed_vk_url is not None
+            else (seller_card.vk_url if seller_card else None),
+        )
 
         await self.session.commit()
 
@@ -499,6 +676,9 @@ class ModerationService:
             brandDescription=refreshed.proposed_desc,
             avatarImage=refreshed.proposed_avatar_image,
             bannerImage=refreshed.proposed_banner_image,
+            tiktokUrl=refreshed.proposed_tiktok_url,
+            telegramChannelUrl=refreshed.proposed_telegram_channel_url,
+            vkUrl=refreshed.proposed_vk_url,
             actionType=refreshed.action_type.value,
         )
 
@@ -516,6 +696,10 @@ class ModerationService:
             raise ValueError("Status must be APPROVED or REJECTED")
 
         entity_type, entity_id = self.parse_proposal_id(proposal_id)
+        if entity_type == self.PRODUCT_DELETE_PREFIX:
+            return await self._decide_product_deletion(
+                entity_id, moderator_id, status, comment
+            )
         if entity_type == self.PRODUCT_PREFIX:
             return await self._decide_product(
                 entity_id, moderator_id, status, comment
@@ -579,7 +763,85 @@ class ModerationService:
         if refreshed_product is None:
             raise ValueError("Product not found")
 
+        if status == ModerationStatus.APPROVED:
+            from app.services.product import ProductService
+
+            await ProductService(self.session)._sync_catalog_facet_after_change(
+                refreshed_product,
+                previous_attributes=None,
+                was_visible=False,
+            )
+
         return self._product_to_proposal(refreshed_product)
+
+    async def _decide_product_deletion(
+        self,
+        product_id: int,
+        moderator_id: int,
+        status: ModerationStatus,
+        comment: str | None,
+    ) -> ModerationProposalResponse:
+        product = await self.product_repo.get_product(
+            ProductSpec(
+                id=product_id,
+                include_images=True,
+                include_inventory=True,
+                include_seller_card=True,
+                include_subcategory=True,
+                include_moderations=True,
+                approved_only=False,
+            )
+        )
+        if product is None:
+            raise ValueError("Product not found")
+        if product.deletion_request_status != ModerationStatus.PENDING:
+            raise ValueError("Product deletion is not pending moderation")
+
+        default_comment = (
+            "Удаление товара подтверждено модератором."
+            if status == ModerationStatus.APPROVED
+            else "Удаление товара отклонено модератором."
+        )
+        moderation_comment = (comment or default_comment).strip()
+        if not moderation_comment:
+            raise ValueError("Comment is required")
+
+        proposal = self._product_deletion_to_proposal(product)
+
+        if status == ModerationStatus.APPROVED:
+            from app.services.product import ProductService
+
+            await ProductService(self.session).delete_approved_product(product_id)
+            proposal.status = ModerationStatus.APPROVED
+            proposal.moderationComment = moderation_comment
+            return proposal
+
+        product.deletion_request_status = ModerationStatus.REJECTED
+        self.session.add(
+            ProductModeration(
+                product_id=product.id,
+                moderator_id=moderator_id,
+                status=ModerationStatus.REJECTED,
+                comment=f"Удаление товара: {moderation_comment}",
+            )
+        )
+        await self.session.commit()
+
+        refreshed_product = await self.product_repo.get_product(
+            ProductSpec(
+                id=product_id,
+                include_images=True,
+                include_inventory=True,
+                include_seller_card=True,
+                include_subcategory=True,
+                include_moderations=True,
+                approved_only=False,
+            )
+        )
+        if refreshed_product is None:
+            raise ValueError("Product not found")
+
+        return self._product_deletion_to_proposal(refreshed_product)
 
     async def _decide_brand(
         self,
@@ -614,6 +876,9 @@ class ModerationService:
             seller_card.desc = moderation.proposed_desc
             seller_card.banner_image = moderation.proposed_banner_image
             seller_card.avatar_image = moderation.proposed_avatar_image
+            seller_card.tiktok_url = moderation.proposed_tiktok_url
+            seller_card.telegram_channel_url = moderation.proposed_telegram_channel_url
+            seller_card.vk_url = moderation.proposed_vk_url
             seller_card.status = ModerationStatus.APPROVED
         elif moderation.action_type == SellerCardModerationAction.CREATE_SHOP:
             seller_card.status = ModerationStatus.REJECTED

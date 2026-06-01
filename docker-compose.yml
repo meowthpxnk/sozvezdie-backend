@@ -8,6 +8,11 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
+            # If files.pythonhosted.org hangs, mirror is set in Dockerfile (Aliyun).
+            # Other mirrors: pip.vizorlabs.ru, ftp.mirror.yandex.ru/pypi/web
+            # args:
+            #     PYPI_MIRROR: https://pip.vizorlabs.ru/simple/
+            #     PYPI_TRUSTED_HOST: pip.vizorlabs.ru
         ports:
             - "8000:8000"
         depends_on:
@@ -77,6 +82,9 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
+            # args:
+            #     PYPI_MIRROR: https://pip.vizorlabs.ru/simple/
+            #     PYPI_TRUSTED_HOST: pip.vizorlabs.ru
         depends_on:
             - postgres
             - rabbitmq

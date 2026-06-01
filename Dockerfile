@@ -1,31 +1,30 @@
 # ===== Stage 1: Build dependencies in isolated environment =====
 FROM python:3.12-slim as builder
 
-# PyPI mirror when pypi.org / files.pythonhosted.org are unreachable (e.g. RU VPS).
+# PyPI mirror when files.pythonhosted.org is unreachable (common on RU VPS).
 # Override: docker build --build-arg PYPI_MIRROR=https://pypi.org/simple/ .
-ARG PYPI_MIRROR=https://mirror.yandex.ru/mirrors/pypi/simple/
+ARG PYPI_MIRROR=https://mirrors.aliyun.com/pypi/simple/
+ARG PYPI_TRUSTED_HOST=mirrors.aliyun.com
 
 WORKDIR /app
 
-# Install Poetry via mirror
-RUN pip install --no-cache-dir poetry \
+# Install Poetry via mirror; plugin rewrites pypi.org URLs (no pyproject.toml changes)
+RUN pip install --no-cache-dir poetry poetry-plugin-pypi-mirror \
     -i "${PYPI_MIRROR}" \
-    --trusted-host mirror.yandex.ru
+    --trusted-host "${PYPI_TRUSTED_HOST}"
 
 # Configure Poetry
 ENV POETRY_NO_INTERACTION=1 \
     POETRY_CACHE_DIR="/tmp/poetry_cache" \
     POETRY_HTTP_TIMEOUT=300 \
-    PIP_DEFAULT_TIMEOUT=300
+    PIP_DEFAULT_TIMEOUT=300 \
+    POETRY_PYPI_MIRROR_URL="${PYPI_MIRROR}"
 
 # 🔥 Critical: disable virtual environment creation
 RUN poetry config virtualenvs.create false
 
 # Copy project files
 COPY pyproject.toml poetry.lock ./
-
-# Primary index = mirror (disables implicit PyPI → no files.pythonhosted.org)
-RUN poetry source add --priority=primary mirror "${PYPI_MIRROR}"
 
 RUN apt-get update && apt-get install -y \
     gcc \

@@ -5,6 +5,7 @@ from app.models import AdvertBanner
 from app.schemas.api.responses import AdvertBannerResponse
 from app.schemas.schemas import (
     AdvertBannerCreateForm,
+    AdvertBannerReorderRequest,
     AdvertBannerUpdateForm,
 )
 from app.media_client import MediaClient
@@ -40,6 +41,7 @@ class AdvertBannerService:
             image_uuid=image_id,
             link=data.link,
             text=data.text,
+            sort_order=await self.repo.get_next_sort_order(),
         )
 
         self.repo.add(advert_banner)
@@ -88,3 +90,25 @@ class AdvertBannerService:
             raise ValueError("Advert banner not found")
         await self.repo.delete(advert_banner)
         await self.session.commit()
+
+    async def reorder_advert_banners(
+        self, data: AdvertBannerReorderRequest
+    ) -> list[AdvertBannerResponse]:
+        banners = await self.repo.get_all()
+        banners_by_id = {banner.id: banner for banner in banners}
+        ordered_ids = data.ordered_ids
+
+        if len(ordered_ids) != len(banners_by_id):
+            raise ValueError("Ordered ids must include all banners")
+
+        if len(set(ordered_ids)) != len(ordered_ids):
+            raise ValueError("Ordered ids must be unique")
+
+        if any(banner_id not in banners_by_id for banner_id in ordered_ids):
+            raise ValueError("Unknown banner id in ordered ids")
+
+        for index, banner_id in enumerate(ordered_ids):
+            banners_by_id[banner_id].sort_order = index
+
+        await self.session.commit()
+        return await self.get_advert_banners()

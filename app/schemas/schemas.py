@@ -178,6 +178,10 @@ class AdvertBannerUpdateForm(BaseModel):
     text: str
 
 
+class AdvertBannerReorderRequest(BaseModel):
+    ordered_ids: list[int] = Field(min_length=1)
+
+
 class FaqItemCreateRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     answer: str = Field(min_length=1)

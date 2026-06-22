@@ -11,6 +11,7 @@ from app.schemas.api.responses import (
 from app.schemas.database import UserRoleEnum
 from app.schemas.schemas import (
     AdvertBannerCreateForm,
+    AdvertBannerReorderRequest,
     AdvertBannerUpdateForm,
     FaqItemCreateRequest,
     FaqItemReorderRequest,
@@ -73,6 +74,21 @@ async def create_banner(
         media_client,
     )
     return service._to_response(banner)
+
+
+@router.put("/banners/reorder")
+async def reorder_banners(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: AdvertBannerReorderRequest,
+) -> list[AdvertBannerResponse]:
+    try:
+        return await AdvertBannerService(session).reorder_advert_banners(data)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
 
 
 @router.put("/banners/{banner_id}")

@@ -1,8 +1,6 @@
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User
 from app.models import AdvertBanner
 
 
@@ -17,8 +15,16 @@ class AdvertBannerRepository:
     async def delete(self, advert_banner: AdvertBanner) -> None:
         await self.session.delete(advert_banner)
 
+    async def get_next_sort_order(self) -> int:
+        stmt = select(func.coalesce(func.max(AdvertBanner.sort_order), -1))
+        result = await self.session.execute(stmt)
+        return int(result.scalar_one()) + 1
+
     async def get_all(self) -> list[AdvertBanner]:
-        stmt = select(AdvertBanner).order_by(AdvertBanner.id.desc())
+        stmt = select(AdvertBanner).order_by(
+            AdvertBanner.sort_order.asc(),
+            AdvertBanner.id.asc(),
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 

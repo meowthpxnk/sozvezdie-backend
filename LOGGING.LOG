@@ -82079,3 +82079,100 @@ OSError: Multiple exceptions: [Errno 10061] Connect call failed ('::1', 4002, 0,
 [2026-06-22 17:56:57] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
 [2026-06-22 17:56:57] INFO [alembic.runtime.migration]: Will assume transactional DDL.
 [2026-06-22 17:56:57] ERROR [alembic.util.messaging]: Can't locate revision identified by 'a1b2c3d4e5f6'
+[2026-06-22 18:11:49] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
+[2026-06-22 18:11:49] INFO [alembic.runtime.migration]: Will assume transactional DDL.
+[2026-06-22 18:11:49] ERROR [alembic.util.messaging]: Can't locate revision identified by 'a1b2c3d4e5f6'
+[2026-06-22 18:12:15] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
+[2026-06-22 18:12:15] INFO [alembic.runtime.migration]: Will assume transactional DDL.
+[2026-06-22 18:12:15] ERROR [alembic.util.messaging]: Can't locate revision identified by 'a1b2c3d4e5f6'
+[2026-06-22 18:13:54] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
+[2026-06-22 18:13:54] INFO [alembic.runtime.migration]: Will assume transactional DDL.
+[2026-06-22 18:13:54] ERROR [alembic.util.messaging]: Can't locate revision identified by 'a1b2c3d4e5f6'
+[2026-06-22 18:14:41] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
+[2026-06-22 18:14:41] INFO [alembic.runtime.migration]: Will assume transactional DDL.
+[2026-06-22 18:14:41] INFO [alembic.runtime.migration]: Running upgrade  -> 3c3d9049c996, essage=init
+[2026-06-22 18:14:41] INFO [alembic.runtime.migration]: Running upgrade 3c3d9049c996 -> 98ca5cc9d646, essage=init
+[2026-06-22 18:14:41] INFO [alembic.runtime.migration]: Running upgrade 98ca5cc9d646 -> 1e2695dae2fe, essage=init
+[2026-06-22 18:14:41] INFO [alembic.runtime.migration]: Running upgrade 1e2695dae2fe -> dc649231b173, essage=init
+[2026-06-22 18:14:41] INFO [alembic.runtime.migration]: Running upgrade dc649231b173 -> d36b4ff05302, essage=init
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade d36b4ff05302 -> ba7219f5033e, essage=init
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade ba7219f5033e -> 63e955a0ce14, essage=init
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade 63e955a0ce14 -> 14f9dfdc2655, essage=init
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade 14f9dfdc2655 -> da7ec2184c9d, essage=init
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade da7ec2184c9d -> 0f9ec8a99d58, add unique constraint to cart item
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade 0f9ec8a99d58 -> a8f3c2e1b904, add favourite product and author tables
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade a8f3c2e1b904 -> b534512e16a4, initial
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade b534512e16a4 -> c4a7e2f91b03, add user delivery profile fields
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade c4a7e2f91b03 -> d8f1a2b3c4e5, add order payment and delivery fields
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade d8f1a2b3c4e5 -> e9a1b2c3d4f5, add order created_at
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade e9a1b2c3d4f5 -> f1a2b3c4d5e6, add category and product_category tables
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade f1a2b3c4d5e6 -> g2b3c4d5e6f7, refactor categories and add subcategories
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade g2b3c4d5e6f7 -> h3c4d5e6f7a8, add fandom table and product fandom_slug
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade h3c4d5e6f7a8 -> i4d5e6f7a8b9, add created_at to product and favourites
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade i4d5e6f7a8b9 -> j5e6f7a8b9c0, add seller card moderation
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade j5e6f7a8b9c0 -> k6g7h8i9j0k1, add vk_id_mapping
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade k6g7h8i9j0k1 -> l7h8i9j0k1l2, add delivery cdek dadata support
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade l7h8i9j0k1l2 -> m8n9o0p1q2r3, add yookassa payment id to order
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade m8n9o0p1q2r3 -> n9o0p1q2r3s4, add checkout_payment for pay-before-order flow
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade n9o0p1q2r3s4 -> o0p1q2r3s4t5, add cart_fingerprint to checkout_payment
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade o0p1q2r3s4t5 -> p1q2r3s4t5u6, add integration tasks outbox
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade p1q2r3s4t5u6 -> q2r3s4t5u6v7, add yookassa idempotence key to checkout_payment
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade q2r3s4t5u6v7 -> r3s4t5u6v7w8, add seller card social links
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade r3s4t5u6v7w8 -> s4t5u6v7w8x9, add vk url to seller card
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade s4t5u6v7w8x9 -> t5u6v7w8x9y0, add product deletion request fields
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade t5u6v7w8x9y0 -> u6v7w8x9y0z1, add faq_item table
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade u6v7w8x9y0z1 -> v7w8x9y0z1a2, add order delivered_at
+[2026-06-22 18:14:42] INFO [alembic.runtime.migration]: Running upgrade v7w8x9y0z1a2 -> w8x9y0z1a2b3, add advert banner sort_order
+[2026-06-22 18:14:54] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
+[2026-06-22 18:14:54] INFO [alembic.runtime.migration]: Will assume transactional DDL.
+[2026-06-22 18:15:29] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
+[2026-06-22 18:15:29] INFO [alembic.runtime.migration]: Will assume transactional DDL.
+[2026-06-22 18:16:27] INFO [app]: Startup application
+[2026-06-22 18:16:27] INFO [uvicorn.error]: Will watch for changes in these directories: ['C:\\meowthpxnk\\Work\\sozvezdie\\backend']
+[2026-06-22 18:16:27] INFO [uvicorn.error]: Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[2026-06-22 18:16:27] INFO [uvicorn.error]: Started reloader process [11544] using StatReload
+[2026-06-22 18:16:28] INFO [uvicorn.error]: Started server process [15260]
+[2026-06-22 18:16:28] INFO [uvicorn.error]: Waiting for application startup.
+[2026-06-22 18:16:29] INFO [app]: Super moderator user 'admin' created
+[2026-06-22 18:16:29] INFO [app]: Integration publisher starting (queue=integration_tasks)
+[2026-06-22 18:16:29] INFO [app]: Integration worker starting (queue=integration_tasks)
+[2026-06-22 18:16:29] INFO [uvicorn.error]: Application startup complete.
+[2026-06-22 18:16:33] ERROR [app]: Integration publisher cannot connect to RabbitMQ
+[2026-06-22 18:16:33] ERROR [app]: Integration worker cannot connect to RabbitMQ
+[2026-06-22 18:16:40] ERROR [app]: Integration worker cannot connect to RabbitMQ
+[2026-06-22 18:16:40] ERROR [app]: Integration publisher cannot connect to RabbitMQ
+[2026-06-22 18:16:47] ERROR [app]: Integration worker cannot connect to RabbitMQ
+[2026-06-22 18:16:47] ERROR [app]: Integration publisher cannot connect to RabbitMQ
+[2026-06-22 18:16:54] ERROR [app]: Integration worker cannot connect to RabbitMQ
+[2026-06-22 18:16:54] ERROR [app]: Integration publisher cannot connect to RabbitMQ
+[2026-06-22 18:17:01] ERROR [app]: Integration worker cannot connect to RabbitMQ
+[2026-06-22 18:17:01] ERROR [app]: Integration publisher cannot connect to RabbitMQ
+[2026-06-22 18:17:08] ERROR [app]: Integration worker cannot connect to RabbitMQ
+[2026-06-22 18:17:08] ERROR [app]: Integration publisher cannot connect to RabbitMQ
+[2026-06-22 18:17:13] INFO [uvicorn.error]: Shutting down
+[2026-06-22 18:17:13] INFO [uvicorn.error]: Waiting for application shutdown.
+[2026-06-22 18:17:13] INFO [uvicorn.error]: Application shutdown complete.
+[2026-06-22 18:17:13] INFO [uvicorn.error]: Finished server process [15260]
+[2026-06-22 18:17:18] INFO [uvicorn.error]: Stopping reloader process [11544]
+[2026-06-22 18:17:41] INFO [app]: Startup application
+[2026-06-22 18:17:41] INFO [uvicorn.error]: Will watch for changes in these directories: ['C:\\meowthpxnk\\Work\\sozvezdie\\backend']
+[2026-06-22 18:17:41] INFO [uvicorn.error]: Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[2026-06-22 18:17:41] INFO [uvicorn.error]: Started reloader process [31976] using StatReload
+[2026-06-22 18:17:42] INFO [uvicorn.error]: Stopping reloader process [31976]
+[2026-06-22 18:18:08] INFO [alembic.runtime.migration]: Context impl PostgresqlImpl.
+[2026-06-22 18:18:08] INFO [alembic.runtime.migration]: Will assume transactional DDL.
+[2026-06-22 18:18:15] INFO [app]: Startup application
+[2026-06-22 18:18:15] INFO [uvicorn.error]: Will watch for changes in these directories: ['C:\\meowthpxnk\\Work\\sozvezdie\\backend']
+[2026-06-22 18:18:15] INFO [uvicorn.error]: Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[2026-06-22 18:18:15] INFO [uvicorn.error]: Started reloader process [3784] using StatReload
+[2026-06-22 18:18:17] INFO [uvicorn.error]: Started server process [33784]
+[2026-06-22 18:18:17] INFO [uvicorn.error]: Waiting for application startup.
+[2026-06-22 18:18:17] INFO [app]: Super moderator user 'admin' password synced from ENV
+[2026-06-22 18:18:17] INFO [app]: Integration publisher starting (queue=integration_tasks)
+[2026-06-22 18:18:17] INFO [app]: Integration worker starting (queue=integration_tasks)
+[2026-06-22 18:18:17] INFO [uvicorn.error]: Application startup complete.
+[2026-06-22 18:18:25] INFO [uvicorn.error]: Shutting down
+[2026-06-22 18:18:25] INFO [uvicorn.error]: Waiting for application shutdown.
+[2026-06-22 18:18:25] INFO [uvicorn.error]: Application shutdown complete.
+[2026-06-22 18:18:25] INFO [uvicorn.error]: Finished server process [33784]
+[2026-06-22 18:18:26] INFO [uvicorn.error]: Stopping reloader process [3784]

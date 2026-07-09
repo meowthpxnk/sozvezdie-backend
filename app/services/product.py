@@ -86,8 +86,6 @@ class ProductService:
             )
             if subcategory is None:
                 raise ValueError("Subcategory not found")
-            if subcategory.seller_card_id != data.seller_card_id:
-                raise ValueError("Subcategory does not belong to seller")
             subcategory_id = subcategory.id
         elif category_slug:
             pass
@@ -551,8 +549,6 @@ class ProductService:
             )
             if subcategory is None:
                 raise ValueError("Subcategory not found")
-            if subcategory.seller_card_id != data.seller_card_id:
-                raise ValueError("Subcategory does not belong to seller")
             subcategory_id = subcategory.id
         elif not category_slug:
             category_slug = None
@@ -713,10 +709,24 @@ class ProductService:
 
     @staticmethod
     def _latest_moderator_comment(product: Product) -> str | None:
-        if product.status != ModerationStatus.REJECTED or not product.moderations:
+        if product.status not in {
+            ModerationStatus.APPROVED,
+            ModerationStatus.REJECTED,
+        }:
+            return None
+        if not product.moderations:
             return None
 
-        latest = max(product.moderations, key=lambda moderation: moderation.created_at)
+        product_moderations = [
+            moderation
+            for moderation in product.moderations
+            if moderation.comment
+            and not moderation.comment.startswith("Удаление товара:")
+        ]
+        if not product_moderations:
+            return None
+
+        latest = max(product_moderations, key=lambda moderation: moderation.created_at)
         comment = latest.comment.strip()
         return comment or None
 

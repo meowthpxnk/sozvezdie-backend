@@ -3,6 +3,7 @@ allow_origins:
   - "http://localhost:3001"
   - "https://soz-front.meowthland.ru"
   - "https://constellationshop.ru"
+  - "http://192.168.0.115:3000"
 allow_headers:
   - "*"
 allow_methods:

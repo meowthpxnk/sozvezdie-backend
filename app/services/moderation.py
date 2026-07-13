@@ -229,7 +229,8 @@ class ModerationService:
             changes,
             seller_card,
             moderation,
-            is_update=moderation.action_type == SellerCardModerationAction.UPDATE_BRAND,
+            is_update=moderation.action_type
+            == SellerCardModerationAction.UPDATE_BRAND,
         )
 
         return changes
@@ -244,7 +245,11 @@ class ModerationService:
     ) -> None:
         social_fields = (
             ("TikTok", "tiktok_url", "proposed_tiktok_url"),
-            ("Telegram-канал", "telegram_channel_url", "proposed_telegram_channel_url"),
+            (
+                "Telegram-канал",
+                "telegram_channel_url",
+                "proposed_telegram_channel_url",
+            ),
             ("ВКонтакте", "vk_url", "proposed_vk_url"),
         )
         for label, current_attr, proposed_attr in social_fields:
@@ -301,7 +306,8 @@ class ModerationService:
             ]
             if deletion_moderations:
                 latest = max(
-                    deletion_moderations, key=lambda moderation: moderation.created_at
+                    deletion_moderations,
+                    key=lambda moderation: moderation.created_at,
                 )
                 moderated_by = f"@{latest.moderator.username}"
                 moderation_comment = latest.comment.removeprefix(
@@ -404,7 +410,9 @@ class ModerationService:
             submitted_by = f"{submitted_by} (@{seller_user.username})"
 
         moderated_by = (
-            f"@{moderation.moderator.username}" if moderation.moderator else None
+            f"@{moderation.moderator.username}"
+            if moderation.moderator
+            else None
         )
         cover_uuid = product.images[0].image_uuid if product.images else None
 
@@ -438,7 +446,9 @@ class ModerationService:
         )
 
         deletion_products = (
-            await self.product_repo.list_deletion_requests_for_moderation(status)
+            await self.product_repo.list_deletion_requests_for_moderation(
+                status
+            )
         )
         proposals.extend(
             self._product_deletion_to_proposal(product)
@@ -447,18 +457,26 @@ class ModerationService:
 
         if status in {None, ModerationStatus.APPROVED}:
             product_moderations = (
-                await self.product_repo.list_product_moderations_for_feed(status)
+                await self.product_repo.list_product_moderations_for_feed(
+                    status
+                )
             )
             proposals.extend(
                 self._product_moderation_to_proposal(moderation)
                 for moderation in product_moderations
                 if moderation.comment not in self._DECISION_COMMENTS
+                and not (
+                    moderation.comment
+                    and moderation.comment.startswith("Удаление товара:")
+                )
             )
 
         proposals.sort(key=lambda proposal: proposal.createdAt, reverse=True)
         return proposals
 
-    async def get_catalog_product_edit(self, product_id: int) -> ModerationEditResponse:
+    async def get_catalog_product_edit(
+        self, product_id: int
+    ) -> ModerationEditResponse:
         from app.services.product import ProductService
 
         product_response = await ProductService(
@@ -487,13 +505,17 @@ class ModerationService:
                 title=f"Товар «{product.name}»",
                 type="MODERATOR_PRODUCT_EDIT",
                 status=product.status,
-                submittedBy=product.seller_card.name if product.seller_card else "",
+                submittedBy=(
+                    product.seller_card.name if product.seller_card else ""
+                ),
                 changes=self._build_product_changes(product),
             ),
             product=product_response,
         )
 
-    async def get_catalog_brand_edit(self, seller_card_id: int) -> ModerationEditResponse:
+    async def get_catalog_brand_edit(
+        self, seller_card_id: int
+    ) -> ModerationEditResponse:
         from app.services.seller_card import SellerCardService
 
         seller_card = await SellerCardService(
@@ -545,9 +567,9 @@ class ModerationService:
 
             from app.services.product import ProductService
 
-            product_response = ProductService(self.session)._to_seller_response(
-                product
-            )
+            product_response = ProductService(
+                self.session
+            )._to_seller_response(product)
             return ModerationEditResponse(
                 kind="product",
                 proposal=self._product_deletion_to_proposal(product),
@@ -644,23 +666,37 @@ class ModerationService:
                 fallback_avatar,
             )
         )
-        moderation.proposed_tiktok_url = seller_card_service._resolve_social_url(
-            data.tiktok_url,
-            moderation.proposed_tiktok_url
-            if moderation.proposed_tiktok_url is not None
-            else (seller_card.tiktok_url if seller_card else None),
+        moderation.proposed_tiktok_url = (
+            seller_card_service._resolve_social_url(
+                data.tiktok_url,
+                (
+                    moderation.proposed_tiktok_url
+                    if moderation.proposed_tiktok_url is not None
+                    else (seller_card.tiktok_url if seller_card else None)
+                ),
+            )
         )
-        moderation.proposed_telegram_channel_url = seller_card_service._resolve_social_url(
-            data.telegram_channel_url,
-            moderation.proposed_telegram_channel_url
-            if moderation.proposed_telegram_channel_url is not None
-            else (seller_card.telegram_channel_url if seller_card else None),
+        moderation.proposed_telegram_channel_url = (
+            seller_card_service._resolve_social_url(
+                data.telegram_channel_url,
+                (
+                    moderation.proposed_telegram_channel_url
+                    if moderation.proposed_telegram_channel_url is not None
+                    else (
+                        seller_card.telegram_channel_url
+                        if seller_card
+                        else None
+                    )
+                ),
+            )
         )
         moderation.proposed_vk_url = seller_card_service._resolve_social_url(
             data.vk_url,
-            moderation.proposed_vk_url
-            if moderation.proposed_vk_url is not None
-            else (seller_card.vk_url if seller_card else None),
+            (
+                moderation.proposed_vk_url
+                if moderation.proposed_vk_url is not None
+                else (seller_card.vk_url if seller_card else None)
+            ),
         )
 
         await self.session.commit()
@@ -766,7 +802,9 @@ class ModerationService:
         if status == ModerationStatus.APPROVED:
             from app.services.product import ProductService
 
-            await ProductService(self.session)._sync_catalog_facet_after_change(
+            await ProductService(
+                self.session
+            )._sync_catalog_facet_after_change(
                 refreshed_product,
                 previous_attributes=None,
                 was_visible=False,
@@ -806,15 +844,28 @@ class ModerationService:
         if not moderation_comment:
             raise ValueError("Comment is required")
 
-        proposal = self._product_deletion_to_proposal(product)
-
         if status == ModerationStatus.APPROVED:
             from app.services.product import ProductService
 
-            await ProductService(self.session).delete_approved_product(product_id)
-            proposal.status = ModerationStatus.APPROVED
-            proposal.moderationComment = moderation_comment
-            return proposal
+            await ProductService(self.session).delete_approved_product(
+                product_id,
+                moderator_id=moderator_id,
+                comment=moderation_comment,
+            )
+            refreshed_product = await self.product_repo.get_product(
+                ProductSpec(
+                    id=product_id,
+                    include_images=True,
+                    include_inventory=True,
+                    include_seller_card=True,
+                    include_subcategory=True,
+                    include_moderations=True,
+                    approved_only=False,
+                )
+            )
+            if refreshed_product is None:
+                raise ValueError("Product not found")
+            return self._product_deletion_to_proposal(refreshed_product)
 
         product.deletion_request_status = ModerationStatus.REJECTED
         self.session.add(
@@ -877,7 +928,9 @@ class ModerationService:
             seller_card.banner_image = moderation.proposed_banner_image
             seller_card.avatar_image = moderation.proposed_avatar_image
             seller_card.tiktok_url = moderation.proposed_tiktok_url
-            seller_card.telegram_channel_url = moderation.proposed_telegram_channel_url
+            seller_card.telegram_channel_url = (
+                moderation.proposed_telegram_channel_url
+            )
             seller_card.vk_url = moderation.proposed_vk_url
             seller_card.status = ModerationStatus.APPROVED
         elif moderation.action_type == SellerCardModerationAction.CREATE_SHOP:

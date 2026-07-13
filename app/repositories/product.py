@@ -2,7 +2,13 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Inventory, Product, ProductModeration, SellerCard, Subcategory
+from app.models import (
+    Inventory,
+    Product,
+    ProductModeration,
+    SellerCard,
+    Subcategory,
+)
 from app.schemas.database import ModerationStatus
 
 from .specs.product import ProductSpec
@@ -24,6 +30,8 @@ class ProductRepository:
             )
         if spec.include_subcategory:
             options.append(selectinload(Product.subcategory))
+            options.append(selectinload(Product.category))
+            options.append(selectinload(Product.fandom))
         if spec.include_moderations:
             options.append(
                 selectinload(Product.moderations).selectinload(
@@ -47,6 +55,8 @@ class ProductRepository:
                 ProductModeration.moderator
             ),
             selectinload(Product.subcategory),
+            selectinload(Product.category),
+            selectinload(Product.fandom),
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -64,8 +74,12 @@ class ProductRepository:
             stmt = stmt.where(ProductModeration.status == status)
 
         stmt = stmt.options(
-            selectinload(ProductModeration.product).selectinload(Product.images),
-            selectinload(ProductModeration.product).selectinload(Product.inventory),
+            selectinload(ProductModeration.product).selectinload(
+                Product.images
+            ),
+            selectinload(ProductModeration.product).selectinload(
+                Product.inventory
+            ),
             selectinload(ProductModeration.product)
             .selectinload(Product.seller_card)
             .selectinload(SellerCard.user),
@@ -75,11 +89,7 @@ class ProductRepository:
         return list(result.scalars().unique().all())
 
     async def get_product(self, spec: ProductSpec):
-        if (
-            spec.id is None
-            and spec.seller_card_id is None
-            and not spec.ids
-        ):
+        if spec.id is None and spec.seller_card_id is None and not spec.ids:
             raise ValueError("ProductSpec requires id, ids or authorId")
 
         stmt = select(Product)
@@ -92,7 +102,7 @@ class ProductRepository:
                 Product.seller_card_id == int(spec.seller_card_id)
             )
         if spec.approved_only:
-            stmt = stmt.where(Product.status == ModerationStatus.APPROVED)
+            stmt = self._apply_approved_filter(stmt)
         stmt = stmt.options(*self._product_load_options(spec))
 
         result = await self.session.execute(stmt)
@@ -133,11 +143,13 @@ class ProductRepository:
 
     @staticmethod
     def _apply_approved_filter(stmt):
+        # Soft-deleted products stay in DB with deletion_request_status=APPROVED.
+        # Pending/rejected deletion requests remain publicly visible until approve.
         return stmt.where(
             Product.status == ModerationStatus.APPROVED,
             or_(
                 Product.deletion_request_status.is_(None),
-                Product.deletion_request_status != ModerationStatus.PENDING,
+                Product.deletion_request_status != ModerationStatus.APPROVED,
             ),
         )
 
@@ -146,7 +158,9 @@ class ProductRepository:
         stmt = cls._apply_approved_filter(stmt)
         if inventory_joined:
             return stmt.where(Inventory.quantity > 0)
-        return stmt.join(Inventory, Product.inventory).where(Inventory.quantity > 0)
+        return stmt.join(Inventory, Product.inventory).where(
+            Inventory.quantity > 0
+        )
 
     async def list_deletion_requests_for_moderation(
         self, status: ModerationStatus | None = None
@@ -167,6 +181,8 @@ class ProductRepository:
             selectinload(Product.inventory),
             selectinload(Product.seller_card).selectinload(SellerCard.user),
             selectinload(Product.subcategory),
+            selectinload(Product.category),
+            selectinload(Product.fandom),
             selectinload(Product.moderations).selectinload(
                 ProductModeration.moderator
             ),
@@ -206,9 +222,7 @@ class ProductRepository:
     @staticmethod
     def _escape_ilike_prefix(value: str) -> str:
         escaped = (
-            value.replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_")
+            value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         )
         return f"{escaped}%"
 
@@ -281,7 +295,9 @@ class ProductRepository:
             fandom_slug=fandom_slug,
         )
         stmt = self._apply_starts_with_filter(stmt, starts_with)
-        stmt = self._apply_catalog_filter(stmt, inventory_joined=inventory_joined)
+        stmt = self._apply_catalog_filter(
+            stmt, inventory_joined=inventory_joined
+        )
 
         if after_id is not None:
             if sort in {"newest", "oldest"}:
@@ -447,7 +463,11 @@ class ProductRepository:
         stmt = self._apply_catalog_filter(stmt, inventory_joined=True)
         stmt = stmt.group_by(Subcategory.slug)
         result = await self.session.execute(stmt)
-        return {slug: int(count) for slug, count in result.all() if slug is not None}
+        return {
+            slug: int(count)
+            for slug, count in result.all()
+            if slug is not None
+        }
 
     async def count_catalog_by_fandom(
         self,

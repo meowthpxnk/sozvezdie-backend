@@ -150,6 +150,7 @@ class SellerProductResponse(ProductResponse):
     moderatorComment: str | None = None
     deletionRequestStatus: ModerationStatus | None = None
     deletionRequestReason: str | None = None
+    deletionModeratorComment: str | None = None
 
 
 class ProductDeletionRequestBody(BaseModel):

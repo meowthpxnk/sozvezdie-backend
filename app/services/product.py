@@ -148,7 +148,9 @@ class ProductService:
         if seller_card is None:
             from fastapi import HTTPException
 
-            raise HTTPException(status_code=404, detail="Seller card not found")
+            raise HTTPException(
+                status_code=404, detail="Seller card not found"
+            )
 
         product = await self.repo.get_product(
             ProductSpec(
@@ -180,7 +182,7 @@ class ProductService:
     def _is_catalog_visible(product: Product) -> bool:
         if product.status != ModerationStatus.APPROVED:
             return False
-        if product.deletion_request_status == ModerationStatus.PENDING:
+        if product.deletion_request_status == ModerationStatus.APPROVED:
             return False
         if product.inventory is None or product.inventory.quantity <= 0:
             return False
@@ -224,7 +226,9 @@ class ProductService:
         if facet_attributes is not None:
             await self.facet_cache.apply_delta(facet_attributes, delta=-1)
 
-    async def cancel_pending_product(self, user_id: int, product_id: int) -> None:
+    async def cancel_pending_product(
+        self, user_id: int, product_id: int
+    ) -> None:
         seller_card = await SellerCardRepository(self.session).get_by_user_id(
             user_id
         )
@@ -337,22 +341,55 @@ class ProductService:
         )
         return self._to_seller_response(product)
 
-    async def delete_approved_product(self, product_id: int) -> None:
+    async def delete_approved_product(
+        self,
+        product_id: int,
+        *,
+        moderator_id: int,
+        comment: str,
+    ) -> Product:
         product = await self.repo.get_product(
             ProductSpec(
                 id=product_id,
                 approved_only=False,
+                include_inventory=True,
                 include_subcategory=True,
+                include_moderations=True,
             )
         )
         if product is None:
             raise ValueError("Product not found")
         if product.status != ModerationStatus.APPROVED:
             raise ValueError("Product is not approved")
+        if product.deletion_request_status != ModerationStatus.PENDING:
+            raise ValueError("Product deletion is not pending moderation")
 
-        await self._delete_product_record(product)
+        was_visible = self._is_catalog_visible(product)
+        previous_attributes = (
+            self._product_facet_attributes(product) if was_visible else None
+        )
 
-    async def get_product_for_moderation(self, product_id: int) -> SellerProductResponse:
+        product.deletion_request_status = ModerationStatus.APPROVED
+        self.session.add(
+            ProductModeration(
+                product_id=product.id,
+                moderator_id=moderator_id,
+                status=ModerationStatus.APPROVED,
+                comment=f"Удаление товара: {comment}",
+            )
+        )
+        await self.session.commit()
+        await self.session.refresh(product)
+        await self._sync_catalog_facet_after_change(
+            product,
+            previous_attributes=previous_attributes,
+            was_visible=was_visible,
+        )
+        return product
+
+    async def get_product_for_moderation(
+        self, product_id: int
+    ) -> SellerProductResponse:
         product = await self.repo.get_product(
             ProductSpec(
                 id=product_id,
@@ -386,7 +423,11 @@ class ProductService:
         if product is None:
             raise ValueError("Product not found")
         if product.status != ModerationStatus.APPROVED:
-            raise ValueError("Only approved products can be edited by a moderator")
+            raise ValueError(
+                "Only approved products can be edited by a moderator"
+            )
+        if product.deletion_request_status == ModerationStatus.APPROVED:
+            raise ValueError("Cannot edit a deleted product")
 
         return self._to_seller_response(product)
 
@@ -413,7 +454,9 @@ class ProductService:
             raise ValueError("Product seller not found")
 
         data.seller_card_id = product.seller_card_id
-        return await self.update_product_for_seller(product_id, data, media_client)
+        return await self.update_product_for_seller(
+            product_id, data, media_client
+        )
 
     async def update_product_for_seller(
         self,
@@ -434,7 +477,11 @@ class ProductService:
         if product is None:
             raise ValueError("Product not found")
         if product.deletion_request_status == ModerationStatus.PENDING:
-            raise ValueError("Cannot edit product while deletion is pending moderation")
+            raise ValueError(
+                "Cannot edit product while deletion is pending moderation"
+            )
+        if product.deletion_request_status == ModerationStatus.APPROVED:
+            raise ValueError("Cannot edit a deleted product")
 
         was_visible = self._is_catalog_visible(product)
         previous_attributes = (
@@ -483,7 +530,11 @@ class ProductService:
         if product is None:
             raise ValueError("Product not found")
         if product.status != ModerationStatus.APPROVED:
-            raise ValueError("Only approved products can be edited by a moderator")
+            raise ValueError(
+                "Only approved products can be edited by a moderator"
+            )
+        if product.deletion_request_status == ModerationStatus.APPROVED:
+            raise ValueError("Cannot edit a deleted product")
         if product.seller_card_id is None:
             raise ValueError("Product seller not found")
 
@@ -500,7 +551,9 @@ class ProductService:
             preserve_moderation_status=True,
         )
 
-        moderation_comment = (comment or "Изменение применено модератором.").strip()
+        moderation_comment = (
+            comment or "Изменение применено модератором."
+        ).strip()
         if not moderation_comment:
             raise ValueError("Comment is required")
 
@@ -571,7 +624,9 @@ class ProductService:
         product.fandom_slug = fandom_slug
 
         if product.inventory is None:
-            product.inventory = Inventory(product_id=product.id, quantity=data.quantity)
+            product.inventory = Inventory(
+                product_id=product.id, quantity=data.quantity
+            )
         else:
             product.inventory.quantity = data.quantity
 
@@ -726,13 +781,18 @@ class ProductService:
         if not product_moderations:
             return None
 
-        latest = max(product_moderations, key=lambda moderation: moderation.created_at)
+        latest = max(
+            product_moderations, key=lambda moderation: moderation.created_at
+        )
         comment = latest.comment.strip()
         return comment or None
 
     @staticmethod
-    def _latest_deletion_rejection_comment(product: Product) -> str | None:
-        if product.deletion_request_status != ModerationStatus.REJECTED:
+    def _latest_deletion_moderation_comment(product: Product) -> str | None:
+        if product.deletion_request_status not in (
+            ModerationStatus.REJECTED,
+            ModerationStatus.APPROVED,
+        ):
             return None
         if not product.moderations:
             return None
@@ -746,21 +806,30 @@ class ProductService:
         if not deletion_comments:
             return None
 
-        return deletion_comments[-1].removeprefix("Удаление товара:").strip() or None
+        return (
+            deletion_comments[-1].removeprefix("Удаление товара:").strip()
+            or None
+        )
 
     def _to_seller_response(self, product: Product) -> SellerProductResponse:
         response = self._to_response(product)
-        moderator_comment = self._latest_moderator_comment(product)
-        if moderator_comment is None:
-            moderator_comment = self._latest_deletion_rejection_comment(product)
+        payload = response.model_dump()
+        # Author-facing responses show human-readable Russian titles.
+        if product.subcategory is not None:
+            payload["subcategorySlug"] = product.subcategory.title
+        if product.fandom is not None:
+            payload["fandomSlug"] = product.fandom.title
 
         return SellerProductResponse(
-            **response.model_dump(),
+            **payload,
             moderationStatus=product.status,
             createdAt=product.created_at,
-            moderatorComment=moderator_comment,
+            moderatorComment=self._latest_moderator_comment(product),
             deletionRequestStatus=product.deletion_request_status,
             deletionRequestReason=product.deletion_request_reason,
+            deletionModeratorComment=self._latest_deletion_moderation_comment(
+                product
+            ),
         )
 
     async def get_products_for_seller_user(
@@ -780,7 +849,9 @@ class ProductService:
                 include_moderations=True,
             )
         )
-        products = sorted(products, key=lambda product: product.created_at, reverse=True)
+        products = sorted(
+            products, key=lambda product: product.created_at, reverse=True
+        )
         return [self._to_seller_response(product) for product in products]
 
     async def get_products_by_author_id(

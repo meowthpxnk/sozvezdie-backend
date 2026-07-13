@@ -813,17 +813,9 @@ class ProductService:
 
     def _to_seller_response(self, product: Product) -> SellerProductResponse:
         response = self._to_response(product)
-        payload = response.model_dump()
-        # Author-facing responses show human-readable Russian titles.
-        if product.category is not None:
-            payload["categorySlug"] = product.category.title
-        if product.subcategory is not None:
-            payload["subcategorySlug"] = product.subcategory.title
-        if product.fandom is not None:
-            payload["fandomSlug"] = product.fandom.title
 
         return SellerProductResponse(
-            **payload,
+            **response.model_dump(),
             moderationStatus=product.status,
             createdAt=product.created_at,
             moderatorComment=self._latest_moderator_comment(product),
@@ -831,6 +823,17 @@ class ProductService:
             deletionRequestReason=product.deletion_request_reason,
             deletionModeratorComment=self._latest_deletion_moderation_comment(
                 product
+            ),
+            categoryTitle=(
+                product.category.title if product.category is not None else None
+            ),
+            subcategoryTitle=(
+                product.subcategory.title
+                if product.subcategory is not None
+                else None
+            ),
+            fandomTitle=(
+                product.fandom.title if product.fandom is not None else None
             ),
         )
 

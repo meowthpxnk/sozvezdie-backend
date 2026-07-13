@@ -97,6 +97,8 @@ class SellerCardService:
         rejected_count = 0
 
         for product in products:
+            if product.deletion_request_status == ModerationStatus.APPROVED:
+                continue
             if product.inventory is not None:
                 stock_total += product.inventory.quantity
             if product.status == ModerationStatus.PENDING:
@@ -106,9 +108,15 @@ class SellerCardService:
             elif product.status == ModerationStatus.REJECTED:
                 rejected_count += 1
 
+        visible_products = [
+            product
+            for product in products
+            if product.deletion_request_status != ModerationStatus.APPROVED
+        ]
+
         return AuthorDashboardResponse(
             seller_card=self._to_response(seller_card),
-            products_count=len(products),
+            products_count=len(visible_products),
             stock_total=stock_total,
             pending_count=pending_count,
             approved_count=approved_count,

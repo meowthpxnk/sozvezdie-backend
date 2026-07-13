@@ -151,6 +151,9 @@ class SellerProductResponse(ProductResponse):
     deletionRequestStatus: ModerationStatus | None = None
     deletionRequestReason: str | None = None
     deletionModeratorComment: str | None = None
+    categoryTitle: str | None = None
+    subcategoryTitle: str | None = None
+    fandomTitle: str | None = None
 
 
 class ProductDeletionRequestBody(BaseModel):

@@ -815,6 +815,8 @@ class ProductService:
         response = self._to_response(product)
         payload = response.model_dump()
         # Author-facing responses show human-readable Russian titles.
+        if product.category is not None:
+            payload["categorySlug"] = product.category.title
         if product.subcategory is not None:
             payload["subcategorySlug"] = product.subcategory.title
         if product.fandom is not None:
@@ -833,7 +835,7 @@ class ProductService:
         )
 
     async def get_products_for_seller_user(
-        self, user_id: int
+        self, user_id: int, *, include_deleted: bool = False
     ) -> list[SellerProductResponse]:
         seller_card = await SellerCardRepository(self.session).get_by_user_id(
             user_id
@@ -849,6 +851,12 @@ class ProductService:
                 include_moderations=True,
             )
         )
+        if not include_deleted:
+            products = [
+                product
+                for product in products
+                if product.deletion_request_status != ModerationStatus.APPROVED
+            ]
         products = sorted(
             products, key=lambda product: product.created_at, reverse=True
         )

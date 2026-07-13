@@ -59,6 +59,7 @@ async def get_my_author_dashboard(
 async def get_my_author_products(
     token: BearerAuthDepends,
     session: DatabaseDepends,
+    include_deleted: bool = Query(False),
 ) -> list[SellerProductResponse]:
     user = await UserService(session).get_user(token.username)
     if user is None:
@@ -72,7 +73,9 @@ async def get_my_author_products(
             detail="Forbidden",
         )
 
-    return await ProductService(session).get_products_for_seller_user(user.id)
+    return await ProductService(session).get_products_for_seller_user(
+        user.id, include_deleted=include_deleted
+    )
 
 
 @router.get("/me/products/{product_id}", name="get_my_author_product")

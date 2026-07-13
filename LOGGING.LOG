@@ -82176,3 +82176,132 @@ OSError: Multiple exceptions: [Errno 10061] Connect call failed ('::1', 4002, 0,
 [2026-06-22 18:18:25] INFO [uvicorn.error]: Application shutdown complete.
 [2026-06-22 18:18:25] INFO [uvicorn.error]: Finished server process [33784]
 [2026-06-22 18:18:26] INFO [uvicorn.error]: Stopping reloader process [3784]
+[2026-07-09 12:34:09] INFO [app]: Startup application
+[2026-07-09 12:34:09] INFO [uvicorn.error]: Will watch for changes in these directories: ['C:\\meowthpxnk\\Work\\sozvezdie\\backend']
+[2026-07-09 12:34:09] INFO [uvicorn.error]: Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[2026-07-09 12:34:09] INFO [uvicorn.error]: Started reloader process [16512] using StatReload
+[2026-07-09 12:34:11] INFO [uvicorn.error]: Started server process [52024]
+[2026-07-09 12:34:11] INFO [uvicorn.error]: Waiting for application startup.
+[2026-07-09 12:34:15] ERROR [uvicorn.error]: Traceback (most recent call last):
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\starlette\routing.py", line 694, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\fastapi\routing.py", line 134, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\meowthpxnk\Work\sozvezdie\backend\app\api\api.py", line 25, in app_lifespan
+    await ensure_super_moderator_user(session)
+  File "C:\meowthpxnk\Work\sozvezdie\backend\app\services\super_moderator_bootstrap.py", line 25, in ensure_super_moderator_user
+    existing = await user_service.get_user(username)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\meowthpxnk\Work\sozvezdie\backend\app\services\user.py", line 38, in get_user
+    return await self.repo.get_user(spec)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\meowthpxnk\Work\sozvezdie\backend\app\repositories\user.py", line 42, in get_user
+    result = await self.session.execute(stmt)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 449, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\asyncpg\connection.py", line 2421, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\asyncpg\connect_utils.py", line 1075, in _connect
+    raise last_error or exceptions.TargetServerAttributeNotMatched(
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\asyncpg\connect_utils.py", line 1049, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\asyncpg\connect_utils.py", line 886, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\asyncpg\connect_utils.py", line 931, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\pypoetry\Cache\virtualenvs\sozvezdie-backend-server-K7zDow8X-py3.12\Lib\site-packages\asyncpg\connect_utils.py", line 802, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\meowthpxnk_\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1129, in create_connection
+    raise OSError('Multiple exceptions: {}'.format(
+OSError: Multiple exceptions: [Errno 10061] Connect call failed ('::1', 4002, 0, 0), [Errno 10061] Connect call failed ('127.0.0.1', 4002)
+
+[2026-07-09 12:34:15] ERROR [uvicorn.error]: Application startup failed. Exiting.
+[2026-07-09 12:34:15] INFO [uvicorn.error]: Stopping reloader process [16512]

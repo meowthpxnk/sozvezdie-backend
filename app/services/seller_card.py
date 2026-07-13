@@ -2,7 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.product import ProductRepository
 from app.repositories.seller_card import SellerCardRepository
-from app.repositories.seller_card_moderation import SellerCardModerationRepository
+from app.repositories.seller_card_moderation import (
+    SellerCardModerationRepository,
+)
 from app.repositories.specs.product import ProductSpec
 from app.schemas.schemas import SellerCardCreateForm, SellerCardUpdateForm
 from app.models import SellerCard, SellerCardModeration
@@ -25,7 +27,9 @@ class SellerCardService:
         self.moderation_repo = SellerCardModerationRepository(session)
 
     @staticmethod
-    def _resolve_social_url(value: str | None, current: str | None) -> str | None:
+    def _resolve_social_url(
+        value: str | None, current: str | None
+    ) -> str | None:
         if value is None:
             return current
         return normalize_optional_url(value)
@@ -34,7 +38,9 @@ class SellerCardService:
         seller_cards = await self.repo.get_all()
         return [self._to_response(seller_card) for seller_card in seller_cards]
 
-    async def get_latest_for_landing(self, *, limit: int = 10) -> list[SellerCardResponse]:
+    async def get_latest_for_landing(
+        self, *, limit: int = 10
+    ) -> list[SellerCardResponse]:
         seller_cards = await self.repo.get_latest_approved(limit=limit)
         return [self._to_response(seller_card) for seller_card in seller_cards]
 
@@ -60,13 +66,17 @@ class SellerCardService:
             raise HTTPException(status_code=404, detail="Author not found")
         return self._to_response(seller_card)
 
-    async def get_by_ids(self, author_ids: list[str]) -> list[SellerCardResponse]:
+    async def get_by_ids(
+        self, author_ids: list[str]
+    ) -> list[SellerCardResponse]:
         if not author_ids:
             return []
 
         ids = [int(author_id) for author_id in author_ids]
         seller_cards = await self.repo.get_by_ids(ids)
-        cards_by_id = {seller_card.id: seller_card for seller_card in seller_cards}
+        cards_by_id = {
+            seller_card.id: seller_card for seller_card in seller_cards
+        }
 
         return [
             self._to_response(cards_by_id[author_id])
@@ -74,7 +84,9 @@ class SellerCardService:
             if author_id in cards_by_id
         ]
 
-    async def get_dashboard_for_user(self, user_id: int) -> AuthorDashboardResponse:
+    async def get_dashboard_for_user(
+        self, user_id: int
+    ) -> AuthorDashboardResponse:
         seller_card = await self.repo.get_by_user_id(user_id)
         if seller_card is None:
             return AuthorDashboardResponse()
@@ -129,7 +141,9 @@ class SellerCardService:
         media_client: MediaClient,
         current_value: str | None,
     ) -> str | None:
-        return await self._upload_optional_image(file, media_client, current_value)
+        return await self._upload_optional_image(
+            file, media_client, current_value
+        )
 
     async def _upload_optional_image(
         self,
@@ -184,7 +198,9 @@ class SellerCardService:
             desc=data.desc,
             status=ModerationStatus.PENDING,
             tiktok_url=normalize_optional_url(data.tiktok_url),
-            telegram_channel_url=normalize_optional_url(data.telegram_channel_url),
+            telegram_channel_url=normalize_optional_url(
+                data.telegram_channel_url
+            ),
             vk_url=normalize_optional_url(data.vk_url),
         )
         content = await data.banner_image.read()
@@ -253,11 +269,15 @@ class SellerCardService:
         proposed_vk = self._resolve_social_url(data.vk_url, seller_card.vk_url)
 
         if seller_card.status == ModerationStatus.APPROVED:
-            pending_moderation = await self.moderation_repo.get_pending_for_seller_card(
-                seller_card.id
+            pending_moderation = (
+                await self.moderation_repo.get_pending_for_seller_card(
+                    seller_card.id
+                )
             )
             if pending_moderation is not None:
-                raise ValueError("Brand changes are already pending moderation")
+                raise ValueError(
+                    "Brand changes are already pending moderation"
+                )
 
             await self._create_moderation_record(
                 seller_card,
@@ -283,8 +303,10 @@ class SellerCardService:
         seller_card.vk_url = proposed_vk
         seller_card.status = ModerationStatus.PENDING
 
-        pending_moderation = await self.moderation_repo.get_pending_for_seller_card(
-            seller_card.id
+        pending_moderation = (
+            await self.moderation_repo.get_pending_for_seller_card(
+                seller_card.id
+            )
         )
         if pending_moderation is None:
             await self._create_moderation_record(
@@ -304,7 +326,9 @@ class SellerCardService:
             pending_moderation.proposed_banner_image = proposed_banner
             pending_moderation.proposed_avatar_image = proposed_avatar
             pending_moderation.proposed_tiktok_url = proposed_tiktok
-            pending_moderation.proposed_telegram_channel_url = proposed_telegram
+            pending_moderation.proposed_telegram_channel_url = (
+                proposed_telegram
+            )
             pending_moderation.proposed_vk_url = proposed_vk
             pending_moderation.status = ModerationStatus.PENDING
             pending_moderation.moderator_id = None
@@ -321,7 +345,9 @@ class SellerCardService:
         if seller_card is None:
             raise ValueError("Seller card not found")
         if seller_card.status != ModerationStatus.APPROVED:
-            raise ValueError("Only approved brands can be edited by a moderator")
+            raise ValueError(
+                "Only approved brands can be edited by a moderator"
+            )
         return seller_card
 
     async def update_seller_card_by_moderator(
@@ -336,7 +362,9 @@ class SellerCardService:
         if seller_card is None:
             raise ValueError("Seller card not found")
         if seller_card.status != ModerationStatus.APPROVED:
-            raise ValueError("Only approved brands can be edited by a moderator")
+            raise ValueError(
+                "Only approved brands can be edited by a moderator"
+            )
 
         proposed_name = data.name.strip()
         proposed_desc = data.desc.strip()
@@ -361,7 +389,9 @@ class SellerCardService:
         )
         proposed_vk = self._resolve_social_url(data.vk_url, seller_card.vk_url)
 
-        moderation_comment = (comment or "Изменение применено модератором.").strip()
+        moderation_comment = (
+            comment or "Изменение применено модератором."
+        ).strip()
         if not moderation_comment:
             raise ValueError("Comment is required")
 
@@ -393,14 +423,18 @@ class SellerCardService:
         await self.session.refresh(seller_card)
         return seller_card
 
-    async def cancel_brand_moderation(self, user_id: int, moderation_id: int) -> None:
+    async def cancel_brand_moderation(
+        self, user_id: int, moderation_id: int
+    ) -> None:
         moderation = await self.moderation_repo.get_by_id_for_user(
             moderation_id, user_id
         )
         if moderation is None:
             raise ValueError("Brand moderation not found")
         if moderation.status != ModerationStatus.PENDING:
-            raise ValueError("Only pending moderation requests can be cancelled")
+            raise ValueError(
+                "Only pending moderation requests can be cancelled"
+            )
 
         if moderation.action_type == SellerCardModerationAction.CREATE_SHOP:
             seller_card = moderation.seller_card
@@ -419,7 +453,10 @@ class SellerCardService:
         self, user_id: int
     ) -> list[AuthorBrandModerationResponse]:
         moderations = await self.moderation_repo.list_for_user(user_id)
-        return [self._to_brand_moderation_response(moderation) for moderation in moderations]
+        return [
+            self._to_brand_moderation_response(moderation)
+            for moderation in moderations
+        ]
 
     def _to_brand_moderation_response(
         self, moderation: SellerCardModeration
@@ -442,7 +479,8 @@ class SellerCardService:
             status=moderation.status,
             title=(
                 f"Магазин «{moderation.proposed_name}»"
-                if moderation.action_type == SellerCardModerationAction.CREATE_SHOP
+                if moderation.action_type
+                == SellerCardModerationAction.CREATE_SHOP
                 else f"Бренд «{moderation.proposed_name}»"
             ),
             details=details,

@@ -236,6 +236,10 @@ class ModerationDecisionRequest(BaseModel):
     comment: str | None = None
 
 
+class ModeratorCatalogProductDeleteRequest(BaseModel):
+    comment: str | None = None
+
+
 class ModerationEditResponse(BaseModel):
     kind: str
     proposal: ModerationProposalResponse

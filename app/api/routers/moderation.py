@@ -9,6 +9,7 @@ from app.schemas.api.responses import (
     ModerationDecisionRequest,
     ModerationEditResponse,
     ModerationProposalResponse,
+    ModeratorCatalogProductDeleteRequest,
     ModeratorOrderDetailResponse,
     ModeratorOrderStatusUpdateRequest,
     ModeratorOrdersListResponse,
@@ -246,6 +247,28 @@ async def update_moderator_catalog_product(
 
     try:
         return await product_service.get_product_for_moderator_catalog_edit(product_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.post("/catalog/products/{product_id}/delete")
+async def delete_moderator_catalog_product(
+    product_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+    data: ModeratorCatalogProductDeleteRequest,
+) -> SellerProductResponse:
+    moderator = await require_moderation_access(token, session)
+
+    try:
+        return await ProductService(session).delete_catalog_product_by_moderator(
+            product_id,
+            moderator_id=moderator.id,
+            comment=data.comment,
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

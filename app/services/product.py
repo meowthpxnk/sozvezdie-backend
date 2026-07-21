@@ -387,6 +387,68 @@ class ProductService:
         )
         return product
 
+    async def delete_catalog_product_by_moderator(
+        self,
+        product_id: int,
+        *,
+        moderator_id: int,
+        comment: str | None = None,
+    ) -> SellerProductResponse:
+        from datetime import datetime
+
+        product = await self.repo.get_product(
+            ProductSpec(
+                id=product_id,
+                approved_only=False,
+                include_images=True,
+                include_inventory=True,
+                include_subcategory=True,
+                include_moderations=True,
+            )
+        )
+        if product is None:
+            raise ValueError("Product not found")
+        if product.status != ModerationStatus.APPROVED:
+            raise ValueError("Only approved products can be deleted")
+        if product.deletion_request_status == ModerationStatus.APPROVED:
+            raise ValueError("Product is already deleted")
+
+        default_comment = (
+            "Удаление товара подтверждено модератором."
+            if product.deletion_request_status == ModerationStatus.PENDING
+            else "Товар удалён модератором."
+        )
+        moderation_comment = (comment or default_comment).strip()
+        if not moderation_comment:
+            raise ValueError("Comment is required")
+
+        was_visible = self._is_catalog_visible(product)
+        previous_attributes = (
+            self._product_facet_attributes(product) if was_visible else None
+        )
+
+        if product.deletion_request_status != ModerationStatus.PENDING:
+            if product.deletion_requested_at is None:
+                product.deletion_requested_at = datetime.now()
+
+        product.deletion_request_status = ModerationStatus.APPROVED
+        self.session.add(
+            ProductModeration(
+                product_id=product.id,
+                moderator_id=moderator_id,
+                status=ModerationStatus.APPROVED,
+                comment=f"Удаление товара: {moderation_comment}",
+            )
+        )
+        await self.session.commit()
+        await self.session.refresh(product)
+        await self._sync_catalog_facet_after_change(
+            product,
+            previous_attributes=previous_attributes,
+            was_visible=was_visible,
+        )
+        return self._to_seller_response(product)
+
     async def get_product_for_moderation(
         self, product_id: int
     ) -> SellerProductResponse:

@@ -25,8 +25,15 @@ class FaqItemRepository:
         result = await self.session.execute(stmt)
         return int(result.scalar_one()) + 1
 
-    async def list_items(self, *, search: str | None = None) -> list[FaqItem]:
+    async def list_items(
+        self,
+        *,
+        search: str | None = None,
+        published_only: bool = False,
+    ) -> list[FaqItem]:
         stmt = select(FaqItem).order_by(FaqItem.sort_order.asc(), FaqItem.id.asc())
+        if published_only:
+            stmt = stmt.where(FaqItem.is_published.is_(True))
         if search:
             pattern = f"%{search.strip()}%"
             stmt = stmt.where(

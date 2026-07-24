@@ -185,11 +185,13 @@ class AdvertBannerReorderRequest(BaseModel):
 class FaqItemCreateRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     answer: str = Field(min_length=1)
+    is_published: bool = False
 
 
 class FaqItemUpdateRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     answer: str = Field(min_length=1)
+    is_published: bool
 
 
 class FaqItemReorderRequest(BaseModel):

@@ -20,17 +20,27 @@ class FaqItemService:
             id=item.id,
             question=item.question,
             answer=item.answer,
+            isPublished=item.is_published,
             sortOrder=item.sort_order,
         )
 
-    async def list_items(self, *, search: str | None = None) -> list[FaqItemResponse]:
-        items = await self.repo.list_items(search=search)
+    async def list_items(
+        self,
+        *,
+        search: str | None = None,
+        published_only: bool = False,
+    ) -> list[FaqItemResponse]:
+        items = await self.repo.list_items(
+            search=search,
+            published_only=published_only,
+        )
         return [self._to_response(item) for item in items]
 
     async def create_item(self, data: FaqItemCreateRequest) -> FaqItemResponse:
         item = FaqItem(
             question=data.question.strip(),
             answer=data.answer.strip(),
+            is_published=data.is_published,
             sort_order=await self.repo.get_next_sort_order(),
         )
         self.repo.add(item)
@@ -47,6 +57,7 @@ class FaqItemService:
 
         item.question = data.question.strip()
         item.answer = data.answer.strip()
+        item.is_published = data.is_published
         await self.session.commit()
         await self.session.refresh(item)
         return self._to_response(item)

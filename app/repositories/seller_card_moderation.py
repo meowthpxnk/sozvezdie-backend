@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -50,8 +50,13 @@ class SellerCardModerationRepository:
     async def list_for_user(self, user_id: int) -> list[SellerCardModeration]:
         stmt = (
             select(SellerCardModeration)
-            .join(SellerCard)
-            .where(SellerCard.user_id == user_id)
+            .outerjoin(SellerCard)
+            .where(
+                or_(
+                    SellerCard.user_id == user_id,
+                    SellerCardModeration.user_id == user_id,
+                )
+            )
             .order_by(SellerCardModeration.created_at.desc())
             .options(
                 selectinload(SellerCardModeration.seller_card),

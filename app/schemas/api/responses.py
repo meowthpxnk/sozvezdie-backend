@@ -107,6 +107,7 @@ class ProductCreateRequest(BaseModel):
 class FandomResponse(BaseModel):
     slug: str
     title: str
+    isApproved: bool = False
 
 
 class CategoryResponse(BaseModel):
@@ -114,11 +115,21 @@ class CategoryResponse(BaseModel):
     title: str
 
 
+class CategoryCreateRequest(BaseModel):
+    title: str
+    slug: str
+
+
+class CategoryUpdateRequest(BaseModel):
+    title: str
+
+
 class SubcategoryResponse(BaseModel):
+    id: int
     slug: str
     title: str
     categorySlug: str
-    authorId: str
+    authorId: str | None = None
 
 
 class SubcategoryCreateRequest(BaseModel):
@@ -126,9 +137,30 @@ class SubcategoryCreateRequest(BaseModel):
     slug: str
 
 
+class SubcategoryAdminCreateRequest(BaseModel):
+    title: str
+    slug: str
+    category_slug: str
+
+
+class SubcategoryUpdateRequest(BaseModel):
+    title: str
+
+
 class FandomCreateRequest(BaseModel):
     title: str
     slug: str
+
+
+class FandomAdminCreateRequest(BaseModel):
+    title: str
+    slug: str
+    is_approved: bool = True
+
+
+class FandomUpdateRequest(BaseModel):
+    title: str
+    is_approved: bool
 
 
 class ProductResponse(BaseModel):
@@ -154,6 +186,7 @@ class SellerProductResponse(ProductResponse):
     categoryTitle: str | None = None
     subcategoryTitle: str | None = None
     fandomTitle: str | None = None
+    fandomIsApproved: bool | None = None
 
 
 class ProductDeletionRequestBody(BaseModel):
@@ -396,6 +429,7 @@ class FaqItemResponse(BaseModel):
     id: int
     question: str
     answer: str
+    isPublished: bool = False
     sortOrder: int = 0
 
 

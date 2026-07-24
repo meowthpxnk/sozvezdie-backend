@@ -176,6 +176,7 @@ class SellerCardService:
     ) -> SellerCardModeration:
         moderation = SellerCardModeration(
             seller_card_id=seller_card.id,
+            user_id=seller_card.user_id,
             action_type=action_type,
             status=ModerationStatus.PENDING,
             proposed_name=name,
@@ -341,7 +342,7 @@ class SellerCardService:
     async def get_seller_card_for_moderator_catalog_edit(
         self, seller_card_id: int
     ) -> SellerCard:
-        seller_card = await self.repo.get_by_id(seller_card_id)
+        seller_card = await self.repo.get_by_id_for_moderator(seller_card_id)
         if seller_card is None:
             raise ValueError("Seller card not found")
         if seller_card.status != ModerationStatus.APPROVED:
@@ -349,6 +350,65 @@ class SellerCardService:
                 "Only approved brands can be edited by a moderator"
             )
         return seller_card
+
+    async def delete_catalog_brand_by_moderator(
+        self,
+        seller_card_id: int,
+        *,
+        moderator_id: int,
+        comment: str | None = None,
+    ) -> AuthorBrandModerationResponse:
+        from app.services.product import ProductService
+
+        seller_card = await self.repo.get_by_id_for_moderator(seller_card_id)
+        if seller_card is None:
+            raise ValueError("Seller card not found")
+        if seller_card.status != ModerationStatus.APPROVED:
+            raise ValueError("Only approved shops can be deleted")
+
+        moderation_comment = (comment or "Магазин удалён модератором.").strip()
+        if not moderation_comment:
+            raise ValueError("Comment is required")
+
+        products = await self.product_repo.get_product(
+            ProductSpec(
+                seller_card_id=str(seller_card.id),
+                all=True,
+                approved_only=False,
+                include_inventory=True,
+                include_subcategory=True,
+            )
+        )
+
+        product_service = ProductService(self.session)
+        for product in products:
+            if not product_service._is_catalog_visible(product):
+                continue
+            previous_attributes = product_service._product_facet_attributes(product)
+            await product_service.facet_cache.apply_delta(previous_attributes, delta=-1)
+
+        moderation = SellerCardModeration(
+            seller_card_id=seller_card.id,
+            user_id=seller_card.user_id,
+            moderator_id=moderator_id,
+            action_type=SellerCardModerationAction.DELETE_SHOP,
+            status=ModerationStatus.APPROVED,
+            comment=f"Удаление магазина: {moderation_comment}",
+            proposed_name=seller_card.name,
+            proposed_desc=seller_card.desc,
+            proposed_banner_image=seller_card.banner_image,
+            proposed_avatar_image=seller_card.avatar_image,
+            proposed_tiktok_url=seller_card.tiktok_url,
+            proposed_telegram_channel_url=seller_card.telegram_channel_url,
+            proposed_vk_url=seller_card.vk_url,
+        )
+        self.moderation_repo.add(moderation)
+        await self.session.flush()
+
+        response = self._to_brand_moderation_response(moderation)
+        await self.session.delete(seller_card)
+        await self.session.commit()
+        return response
 
     async def update_seller_card_by_moderator(
         self,
@@ -358,7 +418,7 @@ class SellerCardService:
         moderator_id: int,
         comment: str | None,
     ) -> SellerCard:
-        seller_card = await self.repo.get_by_id(seller_card_id)
+        seller_card = await self.repo.get_by_id_for_moderator(seller_card_id)
         if seller_card is None:
             raise ValueError("Seller card not found")
         if seller_card.status != ModerationStatus.APPROVED:
@@ -397,6 +457,7 @@ class SellerCardService:
 
         moderation = SellerCardModeration(
             seller_card_id=seller_card.id,
+            user_id=seller_card.user_id,
             moderator_id=moderator_id,
             action_type=SellerCardModerationAction.UPDATE_BRAND,
             status=ModerationStatus.APPROVED,
@@ -464,6 +525,8 @@ class SellerCardService:
         action_label = (
             "Создание магазина"
             if moderation.action_type == SellerCardModerationAction.CREATE_SHOP
+            else "Удаление магазина"
+            if moderation.action_type == SellerCardModerationAction.DELETE_SHOP
             else "Изменение бренда"
         )
         details = [
@@ -471,6 +534,12 @@ class SellerCardService:
             f"Название: {moderation.proposed_name}",
         ]
         comment = moderation.comment.strip() if moderation.comment else None
+        if (
+            comment
+            and moderation.action_type == SellerCardModerationAction.DELETE_SHOP
+            and comment.startswith("Удаление магазина:")
+        ):
+            comment = comment.removeprefix("Удаление магазина:").strip() or None
 
         return AuthorBrandModerationResponse(
             id=str(moderation.id),
@@ -480,7 +549,10 @@ class SellerCardService:
             title=(
                 f"Магазин «{moderation.proposed_name}»"
                 if moderation.action_type
-                == SellerCardModerationAction.CREATE_SHOP
+                in {
+                    SellerCardModerationAction.CREATE_SHOP,
+                    SellerCardModerationAction.DELETE_SHOP,
+                }
                 else f"Бренд «{moderation.proposed_name}»"
             ),
             details=details,

@@ -10,6 +10,7 @@ from app.models import (
 )
 from app.models.seller_card_moderation import SellerCardModerationAction
 from app.repositories.product import ProductRepository
+from app.repositories.fandom import FandomRepository
 from app.repositories.seller_card_moderation import (
     SellerCardModerationRepository,
 )
@@ -48,6 +49,7 @@ class ModerationService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.product_repo = ProductRepository(session)
+        self.fandom_repo = FandomRepository(session)
         self.brand_moderation_repo = SellerCardModerationRepository(session)
 
     @staticmethod
@@ -132,11 +134,25 @@ class ModerationService:
             )
 
         if product.fandom_slug:
+            fandom_title = (
+                product.fandom.title
+                if product.fandom is not None
+                else product.fandom_slug
+            )
+            is_new_fandom = (
+                product.fandom is not None and not product.fandom.is_approved
+            )
+            after = fandom_title
+            if is_new_fandom:
+                after = (
+                    f"{fandom_title} — * новый фандом, "
+                    "ещё не проходил модерацию"
+                )
             changes.append(
                 ModerationFieldDiffResponse(
                     label="Фандом",
                     before="—",
-                    after=product.fandom_slug,
+                    after=after,
                 )
             )
 
@@ -562,8 +578,13 @@ class ModerationService:
             )
             if product is None:
                 raise ValueError("Product not found")
-            if product.deletion_request_status != ModerationStatus.PENDING:
-                raise ValueError("Product deletion is not pending moderation")
+            if product.deletion_request_status not in {
+                ModerationStatus.PENDING,
+                ModerationStatus.REJECTED,
+            }:
+                raise ValueError(
+                    "Product deletion is not available for moderation"
+                )
 
             from app.services.product import ProductService
 
@@ -590,8 +611,11 @@ class ModerationService:
             )
             if product is None:
                 raise ValueError("Product not found")
-            if product.status != ModerationStatus.PENDING:
-                raise ValueError("Product is not pending moderation")
+            if product.status not in {
+                ModerationStatus.PENDING,
+                ModerationStatus.REJECTED,
+            }:
+                raise ValueError("Product is not available for moderation")
 
             from app.services.product import ProductService
 
@@ -607,8 +631,11 @@ class ModerationService:
         moderation = await self.brand_moderation_repo.get_by_id(entity_id)
         if moderation is None:
             raise ValueError("Brand moderation not found")
-        if moderation.status != ModerationStatus.PENDING:
-            raise ValueError("Brand moderation is not pending")
+        if moderation.status not in {
+            ModerationStatus.PENDING,
+            ModerationStatus.REJECTED,
+        }:
+            raise ValueError("Brand moderation is not available")
 
         return ModerationEditResponse(
             kind="brand",
@@ -638,8 +665,22 @@ class ModerationService:
         moderation = await self.brand_moderation_repo.get_by_id(entity_id)
         if moderation is None:
             raise ValueError("Brand moderation not found")
-        if moderation.status != ModerationStatus.PENDING:
-            raise ValueError("Brand moderation is not pending")
+        if moderation.status not in {
+            ModerationStatus.PENDING,
+            ModerationStatus.REJECTED,
+        }:
+            raise ValueError("Brand moderation is not available for editing")
+
+        if moderation.status == ModerationStatus.REJECTED:
+            moderation.status = ModerationStatus.PENDING
+            moderation.moderator_id = None
+            moderation.comment = None
+            if (
+                moderation.action_type == SellerCardModerationAction.CREATE_SHOP
+                and moderation.seller_card is not None
+                and moderation.seller_card.status == ModerationStatus.REJECTED
+            ):
+                moderation.seller_card.status = ModerationStatus.PENDING
 
         seller_card = moderation.seller_card
         seller_card_service = SellerCardService(self.session)
@@ -764,8 +805,11 @@ class ModerationService:
         if product is None:
             raise ValueError("Product not found")
 
-        if product.status != ModerationStatus.PENDING:
-            raise ValueError("Product is not pending moderation")
+        if product.status not in {
+            ModerationStatus.PENDING,
+            ModerationStatus.REJECTED,
+        }:
+            raise ValueError("Product is not available for moderation decision")
 
         default_comment = (
             "Заявка принята модератором."
@@ -784,6 +828,8 @@ class ModerationService:
             comment=moderation_comment,
         )
         self.session.add(moderation)
+        if status == ModerationStatus.APPROVED:
+            await self.fandom_repo.mark_approved(product.fandom_slug)
         await self.session.commit()
 
         refreshed_product = await self.product_repo.get_product(
@@ -832,8 +878,13 @@ class ModerationService:
         )
         if product is None:
             raise ValueError("Product not found")
-        if product.deletion_request_status != ModerationStatus.PENDING:
-            raise ValueError("Product deletion is not pending moderation")
+        if product.deletion_request_status not in {
+            ModerationStatus.PENDING,
+            ModerationStatus.REJECTED,
+        }:
+            raise ValueError(
+                "Product deletion is not available for moderation decision"
+            )
 
         default_comment = (
             "Удаление товара подтверждено модератором."
@@ -905,8 +956,13 @@ class ModerationService:
         if moderation is None:
             raise ValueError("Brand moderation not found")
 
-        if moderation.status != ModerationStatus.PENDING:
-            raise ValueError("Brand moderation is not pending")
+        if moderation.status not in {
+            ModerationStatus.PENDING,
+            ModerationStatus.REJECTED,
+        }:
+            raise ValueError(
+                "Brand moderation is not available for decision"
+            )
 
         default_comment = (
             "Заявка принята модератором."

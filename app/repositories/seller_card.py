@@ -61,6 +61,14 @@ class SellerCardRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id_for_moderator(self, author_id: int) -> SellerCard | None:
+        stmt = select(SellerCard).where(
+            SellerCard.id == author_id,
+            SellerCard.status == ModerationStatus.APPROVED,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_by_ids(
         self, author_ids: list[int], *, catalog_visible_only: bool = False
     ) -> list[SellerCard]:

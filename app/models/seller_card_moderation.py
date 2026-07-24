@@ -16,11 +16,16 @@ if TYPE_CHECKING:
 class SellerCardModerationAction(str, Enum):
     CREATE_SHOP = "CREATE_SHOP"
     UPDATE_BRAND = "UPDATE_BRAND"
+    DELETE_SHOP = "DELETE_SHOP"
 
 
 class SellerCardModeration(Base, WithIDMixin):
-    seller_card_id: Mapped[int] = mapped_column(
-        ForeignKey("seller_card.id", ondelete="CASCADE")
+    seller_card_id: Mapped[int | None] = mapped_column(
+        ForeignKey("seller_card.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     moderator_id: Mapped[int | None] = mapped_column(
         ForeignKey("user.id", ondelete="SET NULL"),

@@ -23,11 +23,11 @@ class Subcategory(Base, WithIDMixin):
         ForeignKey("category.slug", ondelete="CASCADE"),
         nullable=False,
     )
-    seller_card_id: Mapped[int] = mapped_column(
+    seller_card_id: Mapped[int | None] = mapped_column(
         ForeignKey("seller_card.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
 
     category: Mapped["Category"] = relationship(back_populates="subcategories")
-    seller_card: Mapped["SellerCard"] = relationship(back_populates="subcategories")
+    seller_card: Mapped["SellerCard | None"] = relationship(back_populates="subcategories")
     products: Mapped[list["Product"]] = relationship(back_populates="subcategory")

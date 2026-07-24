@@ -6,6 +6,7 @@ from app.api.dependencies import DatabaseDepends
 from app.api.dependencies.auth import BearerAuthDepends
 from app.api.dependencies.moderation_access import ModerationAccessDepends, require_moderation_access
 from app.schemas.api.responses import (
+    AuthorBrandModerationResponse,
     ModerationDecisionRequest,
     ModerationEditResponse,
     ModerationProposalResponse,
@@ -266,6 +267,28 @@ async def delete_moderator_catalog_product(
     try:
         return await ProductService(session).delete_catalog_product_by_moderator(
             product_id,
+            moderator_id=moderator.id,
+            comment=data.comment,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.post("/catalog/brands/{seller_card_id}/delete")
+async def delete_moderator_catalog_brand(
+    seller_card_id: int,
+    token: BearerAuthDepends,
+    session: DatabaseDepends,
+    data: ModeratorCatalogProductDeleteRequest,
+) -> AuthorBrandModerationResponse:
+    moderator = await require_moderation_access(token, session)
+
+    try:
+        return await SellerCardService(session).delete_catalog_brand_by_moderator(
+            seller_card_id,
             moderator_id=moderator.id,
             comment=data.comment,
         )

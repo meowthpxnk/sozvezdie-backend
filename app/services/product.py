@@ -464,8 +464,11 @@ class ProductService:
         )
         if product is None:
             raise ValueError("Product not found")
-        if product.status != ModerationStatus.PENDING:
-            raise ValueError("Product is not pending moderation")
+        if product.status not in {
+            ModerationStatus.PENDING,
+            ModerationStatus.REJECTED,
+        }:
+            raise ValueError("Product is not available for moderation")
 
         return self._to_seller_response(product)
 
@@ -510,8 +513,11 @@ class ProductService:
         )
         if product is None:
             raise ValueError("Product not found")
-        if product.status != ModerationStatus.PENDING:
-            raise ValueError("Product is not pending moderation")
+        if product.status not in {
+            ModerationStatus.PENDING,
+            ModerationStatus.REJECTED,
+        }:
+            raise ValueError("Product is not available for moderation editing")
         if product.seller_card_id is None:
             raise ValueError("Product seller not found")
 
@@ -627,6 +633,7 @@ class ProductService:
                 comment=moderation_comment,
             )
         )
+        await self.fandom_repo.mark_approved(product.fandom_slug)
         await self.session.commit()
 
         refreshed = await self.repo.get_product(
@@ -896,6 +903,9 @@ class ProductService:
             ),
             fandomTitle=(
                 product.fandom.title if product.fandom is not None else None
+            ),
+            fandomIsApproved=(
+                product.fandom.is_approved if product.fandom is not None else None
             ),
         )
 

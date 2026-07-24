@@ -53,8 +53,8 @@ async def create_subcategory(
     try:
         return await SubcategoryService(session).create_subcategory(
             category_slug=category_slug,
-            seller_card_id=user.seller_card.id,
             data=request,
+            seller_card_id=user.seller_card.id,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

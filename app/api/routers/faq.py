@@ -12,4 +12,8 @@ async def list_faq_items(
     session: DatabaseDepends,
     search: str | None = Query(default=None),
 ) -> list[FaqItemResponse]:
-    return await FaqItemService(session).list_items(search=search)
+    return await FaqItemService(session).list_items(
+        search=search,
+        published_only=True,
+    )
+

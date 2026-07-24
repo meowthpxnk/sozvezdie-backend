@@ -4,7 +4,16 @@ from app.api.dependencies import DatabaseDepends
 from app.api.dependencies.super_moderator import SuperModeratorDepends
 from app.schemas.api.responses import (
     AdvertBannerResponse,
+    CategoryCreateRequest,
+    CategoryResponse,
+    CategoryUpdateRequest,
+    FandomAdminCreateRequest,
+    FandomResponse,
+    FandomUpdateRequest,
     FaqItemResponse,
+    SubcategoryAdminCreateRequest,
+    SubcategoryResponse,
+    SubcategoryUpdateRequest,
     SuperAdminAssignRoleRequest,
     SuperAdminUserResponse,
 )
@@ -18,7 +27,10 @@ from app.schemas.schemas import (
     FaqItemUpdateRequest,
 )
 from app.services.advert_banner import AdvertBannerService
+from app.services.category import CategoryService
+from app.services.fandom import FandomService
 from app.services.faq_item import FaqItemService
+from app.services.subcategory import SubcategoryService
 from app.services.super_admin import SuperAdminService
 
 router = APIRouter(prefix="/super-admin", tags=["Super Admin"])
@@ -189,6 +201,180 @@ async def delete_faq_item(
 ) -> None:
     try:
         await FaqItemService(session).delete_item(item_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/fandoms")
+async def list_fandoms(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    search: str | None = Query(default=None),
+) -> list[FandomResponse]:
+    return await FandomService(session).get_fandoms(search=search)
+
+
+@router.post("/fandoms", status_code=status.HTTP_201_CREATED)
+async def create_fandom(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: FandomAdminCreateRequest,
+) -> FandomResponse:
+    try:
+        return await FandomService(session).create_fandom(data)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.put("/fandoms/{fandom_slug}")
+async def update_fandom(
+    fandom_slug: str,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: FandomUpdateRequest,
+) -> FandomResponse:
+    try:
+        return await FandomService(session).update_fandom(fandom_slug, data)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/fandoms/{fandom_slug}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_fandom(
+    fandom_slug: str,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+) -> None:
+    try:
+        await FandomService(session).delete_fandom(fandom_slug)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/categories")
+async def list_categories(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    search: str | None = Query(default=None),
+) -> list[CategoryResponse]:
+    return await CategoryService(session).get_categories(search=search)
+
+
+@router.post("/categories", status_code=status.HTTP_201_CREATED)
+async def create_category(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: CategoryCreateRequest,
+) -> CategoryResponse:
+    try:
+        return await CategoryService(session).create_category(data)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.put("/categories/{category_slug}")
+async def update_category(
+    category_slug: str,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: CategoryUpdateRequest,
+) -> CategoryResponse:
+    try:
+        return await CategoryService(session).update_category(category_slug, data)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/categories/{category_slug}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_category(
+    category_slug: str,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+) -> None:
+    try:
+        await CategoryService(session).delete_category(category_slug)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/subcategories")
+async def list_subcategories(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    search: str | None = Query(default=None),
+    category_slug: str | None = Query(default=None),
+) -> list[SubcategoryResponse]:
+    return await SubcategoryService(session).list_subcategories(
+        category_slug=category_slug,
+        search=search,
+    )
+
+
+@router.post("/subcategories", status_code=status.HTTP_201_CREATED)
+async def create_subcategory(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: SubcategoryAdminCreateRequest,
+) -> SubcategoryResponse:
+    try:
+        return await SubcategoryService(session).create_admin_subcategory(data)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.put("/subcategories/{subcategory_id}")
+async def update_subcategory(
+    subcategory_id: int,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: SubcategoryUpdateRequest,
+) -> SubcategoryResponse:
+    try:
+        return await SubcategoryService(session).update_subcategory(
+            subcategory_id, data
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.delete(
+    "/subcategories/{subcategory_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_subcategory(
+    subcategory_id: int,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+) -> None:
+    try:
+        await SubcategoryService(session).delete_subcategory(subcategory_id)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

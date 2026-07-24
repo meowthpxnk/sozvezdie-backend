@@ -62,6 +62,8 @@ class SellerCardModeration(Base, WithIDMixin):
     )
 
     seller_card: Mapped["SellerCard"] = relationship(back_populates="moderations")
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])
     moderator: Mapped["User | None"] = relationship(
-        back_populates="seller_card_moderations"
+        back_populates="seller_card_moderations",
+        foreign_keys=[moderator_id],
     )

@@ -53,6 +53,7 @@ class User(Base, WithIDMixin):
     )
     seller_card_moderations: Mapped[list["SellerCardModeration"]] = relationship(
         back_populates="moderator",
+        foreign_keys="SellerCardModeration.moderator_id",
         cascade="all, delete-orphan",
     )
     favourite_products: Mapped[list["FavouriteProduct"]] = relationship(

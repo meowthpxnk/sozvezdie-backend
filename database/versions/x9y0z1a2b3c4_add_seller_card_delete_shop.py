@@ -25,7 +25,21 @@ def upgrade() -> None:
         )
     )
 
-    op.add_column("seller_card_moderation", sa.Column("user_id", sa.Integer(), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = {
+        column["name"] for column in inspector.get_columns("seller_card_moderation")
+    }
+    fks = {
+        fk["name"] for fk in inspector.get_foreign_keys("seller_card_moderation")
+    }
+
+    if "user_id" not in columns:
+        op.add_column(
+            "seller_card_moderation",
+            sa.Column("user_id", sa.Integer(), nullable=True),
+        )
+
     op.execute(
         sa.text(
             """
@@ -38,29 +52,38 @@ def upgrade() -> None:
         )
     )
     op.alter_column("seller_card_moderation", "user_id", nullable=False)
-    op.create_foreign_key(
-        "seller_card_moderation_user_id_fkey",
-        "seller_card_moderation",
-        "user",
-        ["user_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
 
-    op.drop_constraint(
-        "seller_card_moderation_seller_card_id_fkey",
-        "seller_card_moderation",
-        type_="foreignkey",
-    )
+    if "seller_card_moderation_user_id_fkey" not in fks:
+        op.create_foreign_key(
+            "seller_card_moderation_user_id_fkey",
+            "seller_card_moderation",
+            "user",
+            ["user_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
+
+    if "seller_card_moderation_seller_card_id_fkey" in fks:
+        op.drop_constraint(
+            "seller_card_moderation_seller_card_id_fkey",
+            "seller_card_moderation",
+            type_="foreignkey",
+        )
     op.alter_column("seller_card_moderation", "seller_card_id", nullable=True)
-    op.create_foreign_key(
-        "seller_card_moderation_seller_card_id_fkey",
-        "seller_card_moderation",
-        "seller_card",
-        ["seller_card_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    # Re-inspect: constraint may already exist from a partial previous run.
+    inspector = sa.inspect(bind)
+    fks = {
+        fk["name"] for fk in inspector.get_foreign_keys("seller_card_moderation")
+    }
+    if "seller_card_moderation_seller_card_id_fkey" not in fks:
+        op.create_foreign_key(
+            "seller_card_moderation_seller_card_id_fkey",
+            "seller_card_moderation",
+            "seller_card",
+            ["seller_card_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
 
 def downgrade() -> None:

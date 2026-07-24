@@ -19,18 +19,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "subcategory",
-        sa.Column(
-            "is_approved",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.text("false"),
-        ),
+    # IF NOT EXISTS: api and worker both run alembic on startup.
+    op.execute(
+        sa.text(
+            """
+            ALTER TABLE subcategory
+            ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false NOT NULL
+            """
+        )
     )
     # Existing subcategories have already been used — treat as moderated.
     op.execute(sa.text("UPDATE subcategory SET is_approved = true"))
 
 
 def downgrade() -> None:
-    op.drop_column("subcategory", "is_approved")
+    op.execute(sa.text("ALTER TABLE subcategory DROP COLUMN IF EXISTS is_approved"))

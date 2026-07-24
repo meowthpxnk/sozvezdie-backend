@@ -30,6 +30,7 @@ class SubcategoryService:
                 if subcategory.seller_card_id is not None
                 else None
             ),
+            isApproved=subcategory.is_approved,
         )
 
     async def list_subcategories(
@@ -59,6 +60,7 @@ class SubcategoryService:
         data: SubcategoryCreateRequest,
         *,
         seller_card_id: int | None = None,
+        is_approved: bool = False,
     ) -> SubcategoryResponse:
         category = await self.category_repo.get_by_slug(category_slug)
         if category is None:
@@ -78,6 +80,7 @@ class SubcategoryService:
             title=title,
             category_slug=category_slug,
             seller_card_id=seller_card_id,
+            is_approved=is_approved,
         )
         self.repo.add(subcategory)
         await self.session.commit()
@@ -91,6 +94,7 @@ class SubcategoryService:
             category_slug=data.category_slug,
             data=SubcategoryCreateRequest(title=data.title, slug=data.slug),
             seller_card_id=None,
+            is_approved=data.is_approved,
         )
 
     async def update_subcategory(
@@ -105,6 +109,8 @@ class SubcategoryService:
             raise ValueError("Title is required")
 
         subcategory.title = title
+        if data.is_approved is not None:
+            subcategory.is_approved = data.is_approved
         await self.session.commit()
         await self.session.refresh(subcategory)
         return self._to_response(subcategory)

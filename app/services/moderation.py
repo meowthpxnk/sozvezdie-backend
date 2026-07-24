@@ -11,6 +11,7 @@ from app.models import (
 from app.models.seller_card_moderation import SellerCardModerationAction
 from app.repositories.product import ProductRepository
 from app.repositories.fandom import FandomRepository
+from app.repositories.subcategory import SubcategoryRepository
 from app.repositories.seller_card_moderation import (
     SellerCardModerationRepository,
 )
@@ -50,6 +51,7 @@ class ModerationService:
         self.session = session
         self.product_repo = ProductRepository(session)
         self.fandom_repo = FandomRepository(session)
+        self.subcategory_repo = SubcategoryRepository(session)
         self.brand_moderation_repo = SellerCardModerationRepository(session)
 
     @staticmethod
@@ -130,6 +132,22 @@ class ModerationService:
                     label="Категория",
                     before="—",
                     after=product.category_slug,
+                )
+            )
+
+        if product.subcategory is not None:
+            subcategory_title = product.subcategory.title
+            after = subcategory_title
+            if not product.subcategory.is_approved:
+                after = (
+                    f"{subcategory_title} — * новая подкатегория, "
+                    "ещё не проходила модерацию"
+                )
+            changes.append(
+                ModerationFieldDiffResponse(
+                    label="Подкатегория",
+                    before="—",
+                    after=after,
                 )
             )
 
@@ -830,6 +848,7 @@ class ModerationService:
         self.session.add(moderation)
         if status == ModerationStatus.APPROVED:
             await self.fandom_repo.mark_approved(product.fandom_slug)
+            await self.subcategory_repo.mark_approved(product.subcategory_id)
         await self.session.commit()
 
         refreshed_product = await self.product_repo.get_product(

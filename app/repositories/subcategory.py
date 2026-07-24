@@ -47,6 +47,16 @@ class SubcategoryRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def mark_approved(self, subcategory_id: int | None) -> None:
+        if subcategory_id is None:
+            return
+
+        subcategory = await self.get_by_id(subcategory_id)
+        if subcategory is None or subcategory.is_approved:
+            return
+
+        subcategory.is_approved = True
+
     def add(self, subcategory: Subcategory) -> Subcategory:
         self.session.add(subcategory)
         return subcategory

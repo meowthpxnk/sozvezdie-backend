@@ -130,6 +130,7 @@ class SubcategoryResponse(BaseModel):
     title: str
     categorySlug: str
     authorId: str | None = None
+    isApproved: bool = False
 
 
 class SubcategoryCreateRequest(BaseModel):
@@ -141,10 +142,12 @@ class SubcategoryAdminCreateRequest(BaseModel):
     title: str
     slug: str
     category_slug: str
+    is_approved: bool = True
 
 
 class SubcategoryUpdateRequest(BaseModel):
     title: str
+    is_approved: bool | None = None
 
 
 class FandomCreateRequest(BaseModel):
@@ -186,6 +189,7 @@ class SellerProductResponse(ProductResponse):
     categoryTitle: str | None = None
     subcategoryTitle: str | None = None
     fandomTitle: str | None = None
+    subcategoryIsApproved: bool | None = None
     fandomIsApproved: bool | None = None
 
 

@@ -634,6 +634,7 @@ class ProductService:
             )
         )
         await self.fandom_repo.mark_approved(product.fandom_slug)
+        await self.subcategory_repo.mark_approved(product.subcategory_id)
         await self.session.commit()
 
         refreshed = await self.repo.get_product(
@@ -903,6 +904,11 @@ class ProductService:
             ),
             fandomTitle=(
                 product.fandom.title if product.fandom is not None else None
+            ),
+            subcategoryIsApproved=(
+                product.subcategory.is_approved
+                if product.subcategory is not None
+                else None
             ),
             fandomIsApproved=(
                 product.fandom.is_approved if product.fandom is not None else None

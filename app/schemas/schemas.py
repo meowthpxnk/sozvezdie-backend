@@ -61,18 +61,29 @@ class UserCreateForm(BaseModel):
         default=UserRoleEnum.CUSTOMER, description="User role"
     )
 
-    full_name: str = Field(..., min_length=1, max_length=128)
+    last_name: str = Field(..., min_length=1, max_length=128)
+    first_name: str = Field(..., min_length=1, max_length=128)
+    patronymic: str | None = Field(default=None, max_length=128)
     email: str = Field(
         ...,
         max_length=254,
         pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$",
     )
     phone: str = Field(..., min_length=5, max_length=32)
+    author_invite: str | None = None
 
-    @field_validator("full_name", "phone")
+    @field_validator("last_name", "first_name", "phone")
     @classmethod
     def strip_text_fields(cls, v: str) -> str:
         return v.strip()
+
+    @field_validator("patronymic")
+    @classmethod
+    def strip_optional_patronymic(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        stripped = v.strip()
+        return stripped or None
 
     @field_validator("email")
     @classmethod
@@ -117,6 +128,7 @@ class ProductCreateForm(BaseModel):
     category_slug: str | None = None
     subcategory_slug: str | None = None
     fandom_slug: str | None = None
+    is_adult: bool = False
 
 
 class ProductImageSlotForm(BaseModel):
@@ -135,6 +147,7 @@ class ProductUpdateForm(BaseModel):
     category_slug: str | None = None
     subcategory_slug: str | None = None
     fandom_slug: str | None = None
+    is_adult: bool = False
 
 
 class InventoryCreateForm(BaseModel):

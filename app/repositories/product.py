@@ -1,4 +1,4 @@
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,8 +8,10 @@ from app.models import (
     ProductModeration,
     SellerCard,
     Subcategory,
+    User,
 )
 from app.schemas.database import ModerationStatus
+from app.core.blocked_1c import is_blocked_1c_users_enabled
 
 from .specs.product import ProductSpec
 
@@ -103,6 +105,7 @@ class ProductRepository:
             )
         if spec.approved_only:
             stmt = self._apply_approved_filter(stmt)
+            stmt = self._apply_shop_visibility_filter(stmt)
         stmt = stmt.options(*self._product_load_options(spec))
 
         result = await self.session.execute(stmt)
@@ -134,7 +137,7 @@ class ProductRepository:
         options = [
             selectinload(Product.images),
             selectinload(Product.inventory),
-            selectinload(Product.seller_card),
+            selectinload(Product.seller_card).selectinload(SellerCard.user),
             selectinload(Product.subcategory),
         ]
         stmt = stmt.options(*options).distinct()
@@ -153,9 +156,33 @@ class ProductRepository:
             ),
         )
 
+    @staticmethod
+    def _apply_shop_visibility_filter(stmt):
+        shop_filters = [
+            SellerCard.id == Product.seller_card_id,
+            SellerCard.is_disabled.is_(False),
+        ]
+        if is_blocked_1c_users_enabled():
+            return stmt.where(
+                exists(
+                    select(1)
+                    .select_from(SellerCard)
+                    .join(User, User.id == SellerCard.user_id)
+                    .where(
+                        *shop_filters,
+                        User.one_c_author_id.is_not(None),
+                        User.one_c_author_id != "",
+                    )
+                )
+            )
+        return stmt.where(
+            exists(select(1).select_from(SellerCard).where(*shop_filters))
+        )
+
     @classmethod
     def _apply_catalog_filter(cls, stmt, *, inventory_joined: bool = False):
         stmt = cls._apply_approved_filter(stmt)
+        stmt = cls._apply_shop_visibility_filter(stmt)
         if inventory_joined:
             return stmt.where(Inventory.quantity > 0)
         return stmt.join(Inventory, Product.inventory).where(
@@ -194,7 +221,7 @@ class ProductRepository:
         return [
             selectinload(Product.images),
             selectinload(Product.inventory),
-            selectinload(Product.seller_card),
+            selectinload(Product.seller_card).selectinload(SellerCard.user),
             selectinload(Product.subcategory),
         ]
 

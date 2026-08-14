@@ -30,7 +30,8 @@ async def ensure_super_moderator_user(session: AsyncSession) -> None:
                 username=username,
                 password=password,
                 role=UserRoleEnum.CUSTOMER,
-                full_name="Super Moderator",
+                last_name="Moderator",
+                first_name="Super",
                 email=f"{username}@super.local",
                 phone="+70000000000",
             )

@@ -339,6 +339,91 @@ class SellerCardService:
         await self.session.refresh(seller_card)
         return seller_card
 
+    async def _shop_products_for_facets(self, seller_card: SellerCard):
+        products = await self.product_repo.get_product(
+            ProductSpec(
+                seller_card_id=str(seller_card.id),
+                all=True,
+                approved_only=False,
+                include_inventory=True,
+                include_subcategory=True,
+                include_seller_card=True,
+            )
+        )
+        if products is None:
+            return []
+        return list(products)
+
+    async def _sync_shop_catalog_facets(
+        self, seller_card: SellerCard, *, disabled: bool
+    ) -> None:
+        from app.services.product import ProductService
+
+        if bool(seller_card.is_disabled) == disabled:
+            return
+
+        product_service = ProductService(self.session)
+        products = await self._shop_products_for_facets(seller_card)
+        previously_visible = [
+            product
+            for product in products
+            if product_service._is_catalog_visible(product)
+        ]
+
+        seller_card.is_disabled = disabled
+        for product in products:
+            if product.seller_card is not None:
+                product.seller_card.is_disabled = disabled
+
+        now_visible_ids = {
+            product.id
+            for product in products
+            if product_service._is_catalog_visible(product)
+        }
+        previously_visible_ids = {product.id for product in previously_visible}
+
+        for product in previously_visible:
+            if product.id not in now_visible_ids:
+                await product_service.facet_cache.apply_delta(
+                    product_service._product_facet_attributes(product),
+                    delta=-1,
+                )
+        for product in products:
+            if (
+                product.id in now_visible_ids
+                and product.id not in previously_visible_ids
+            ):
+                await product_service.facet_cache.apply_delta(
+                    product_service._product_facet_attributes(product),
+                    delta=1,
+                )
+
+    async def disable_shop(self, seller_card: SellerCard) -> None:
+        await self._sync_shop_catalog_facets(seller_card, disabled=True)
+
+    async def enable_shop(self, seller_card: SellerCard) -> None:
+        await self._sync_shop_catalog_facets(seller_card, disabled=False)
+
+    async def delete_shop_for_user(self, user_id: int) -> None:
+        from app.services.product import ProductService
+
+        seller_card = await self.repo.get_by_user_id(user_id)
+        if seller_card is None:
+            raise ValueError("Магазин не найден")
+
+        product_service = ProductService(self.session)
+        products = await self._shop_products_for_facets(seller_card)
+        for product in products:
+            if not product_service._is_catalog_visible(product):
+                continue
+            await product_service.facet_cache.apply_delta(
+                product_service._product_facet_attributes(product),
+                delta=-1,
+            )
+
+        await self.session.delete(seller_card)
+        await self.session.flush()
+
     async def get_seller_card_for_moderator_catalog_edit(
         self, seller_card_id: int
     ) -> SellerCard:

@@ -16,8 +16,8 @@ from app.utils.security import verify_secret
 
 from app.repositories.user import UserRepository
 
-# from app.repositories.user_settings import UserSettingsRepository
 from app.repositories.specs.user import UserSpec
+from app.services.author_invite import AuthorInviteService
 
 # from app.repositories.specs.user_settings import UserSettingsSpec
 # from app.services.seller_card import SellerCardService
@@ -50,7 +50,9 @@ class UserService:
             username=data.username,
             password_hash=security.hash_secret(data.password),
             role=data.role,
-            full_name=data.full_name,
+            last_name=data.last_name,
+            first_name=data.first_name,
+            patronymic=data.patronymic,
             email=data.email,
             phone=data.phone,
             settings=UserSettings(),
@@ -60,6 +62,12 @@ class UserService:
         user.cart = Cart()
 
         self.repo.add(user)
+        await self.session.flush()
+
+        if data.author_invite:
+            await AuthorInviteService(self.session).apply_invite_to_new_user(
+                user, data.author_invite
+            )
 
         await self.session.commit()
         await self.session.refresh(user)
@@ -89,6 +97,16 @@ class UserService:
         )
         await self.session.commit()
 
+    async def confirm_age(self, username: str) -> User | None:
+        user = await self.get_user(username)
+        if user is None:
+            return None
+
+        user.age_confirmed = True
+        await self.session.commit()
+        await self.session.refresh(user)
+        return user
+
     async def update_user_profile(
         self,
         username: str,
@@ -100,7 +118,9 @@ class UserService:
 
         updated = await self.repo.update_profile(
             user,
-            full_name=data.full_name,
+            last_name=data.last_name,
+            first_name=data.first_name,
+            patronymic=data.patronymic,
             email=data.email,
             phone=data.phone,
         )

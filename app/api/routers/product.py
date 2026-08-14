@@ -14,6 +14,7 @@ from datetime import datetime
 from app.schemas.schemas import ProductCreateForm
 from app.services import ProductService
 from app.services.user import UserService
+from app.utils.product_form import parse_flags_is_adult, resolve_is_adult
 
 router = APIRouter()
 
@@ -136,6 +137,10 @@ async def create_product(
     category_slug: str | None = Form(default=None),
     subcategory_slug: str | None = Form(default=None),
     fandom_slug: str | None = Form(default=None),
+    is_adult: str | None = Form(default=None),
+    flags: str | None = Form(default=None),
+    adult: str | None = Form(default=None),
+    adult_query: str | None = Query(default=None, alias="adult"),
     files: list[UploadFile] = File(...),
 ) -> None:
     from app.core import media_client
@@ -169,6 +174,12 @@ async def create_product(
         category_slug=category_slug,
         subcategory_slug=subcategory_slug,
         fandom_slug=fandom_slug,
+        is_adult=resolve_is_adult(
+            form_value=is_adult,
+            query_value=adult_query,
+            form_adult=adult,
+            flags_adult=parse_flags_is_adult(flags),
+        ),
     )
 
     try:

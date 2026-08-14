@@ -68,7 +68,15 @@ class OrderRepository:
                 stmt = stmt.join(Order.customer).where(
                     or_(
                         User.username.ilike(pattern),
-                        User.full_name.ilike(pattern),
+                        User.last_name.ilike(pattern),
+                        User.first_name.ilike(pattern),
+                        User.patronymic.ilike(pattern),
+                        func.concat_ws(
+                            " ",
+                            User.last_name,
+                            User.first_name,
+                            User.patronymic,
+                        ).ilike(pattern),
                         User.email.ilike(pattern),
                         User.phone.ilike(pattern),
                     )

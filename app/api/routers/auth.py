@@ -14,6 +14,7 @@ from app.api.dependencies import (
 )
 
 from app.core.super_moderator import resolve_auth_role
+from app.core.blocked_1c import is_user_blocked_without_1c
 from app.schemas.api.responses import MeResponse
 from app.exceptions.security import WrongSecret
 from app.schemas.schemas import ChangePasswordForm, UserCreateForm
@@ -120,7 +121,13 @@ async def create_user(
     db_session: DatabaseDepends,
 ):
     # TODO: remove this after testing
-    await UserService(db_session).create_user(data)
+    try:
+        await UserService(db_session).create_user(data)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
 
 
 @router.get("/me")
@@ -138,9 +145,17 @@ async def get_me(
         id=user.id,
         username=user.username,
         role=resolve_auth_role(user.username, user.role),
-        full_name=user.full_name,
+        last_name=user.last_name,
+        first_name=user.first_name,
+        patronymic=user.patronymic,
         email=user.email,
         phone=user.phone,
+        one_c_author_id=user.one_c_author_id,
+        is_blocked_without_1c=is_user_blocked_without_1c(
+            role=user.role,
+            one_c_author_id=user.one_c_author_id,
+        ),
+        age_confirmed=bool(user.age_confirmed),
     )
 
 

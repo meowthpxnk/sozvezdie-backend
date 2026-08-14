@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -17,7 +17,7 @@ class Subcategory(Base, WithIDMixin):
         UniqueConstraint("category_slug", "slug", name="uq_subcategory_category_slug"),
     )
 
-    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     category_slug: Mapped[str] = mapped_column(

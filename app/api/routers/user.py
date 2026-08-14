@@ -3,7 +3,11 @@ from fastapi import HTTPException, status
 from app.api.auth_routing import RBACRouter
 from app.api.dependencies import DatabaseDepends
 from app.api.dependencies.auth import BearerAuthDepends
-from app.schemas.api.responses import UserProfileResponse, UserProfileUpdateRequest
+from app.schemas.api.responses import (
+    AgeConfirmationResponse,
+    UserProfileResponse,
+    UserProfileUpdateRequest,
+)
 from app.schemas.permissions import PermissionEnum
 from app.services.user import UserService
 
@@ -14,10 +18,26 @@ def _to_profile_response(user) -> UserProfileResponse:
     return UserProfileResponse(
         id=user.id,
         username=user.username,
-        full_name=user.full_name,
+        last_name=user.last_name,
+        first_name=user.first_name,
+        patronymic=user.patronymic,
         email=user.email,
         phone=user.phone,
     )
+
+
+@router.post("/age-confirmation")
+async def confirm_age(
+    session: DatabaseDepends,
+    token: BearerAuthDepends,
+) -> AgeConfirmationResponse:
+    user = await UserService(session).confirm_age(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return AgeConfirmationResponse(age_confirmed=True)
 
 
 @router.get("/{user_id}", permissions=PermissionEnum.USER_READ)

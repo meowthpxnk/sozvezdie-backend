@@ -9,7 +9,6 @@ from app.schemas.api.delivery import (
     PvzPointResponse,
 )
 from app.schemas.database import DeliveryMethod
-from app.utils.address_flat import require_flat_for_courier
 
 
 def _to_suggestion(item: dict) -> AddressSuggestionResponse:
@@ -90,16 +89,10 @@ class DeliveryService:
         )
 
     async def calculate(self, data: DeliveryCalculateRequest) -> DeliveryCalculateResponse:
-        if data.delivery_method not in (
-            DeliveryMethod.COURIER,
-            DeliveryMethod.PICKUP_POINT,
-        ):
-            raise ValueError("Delivery calculation is only for CDEK methods")
+        if data.delivery_method != DeliveryMethod.PICKUP_POINT:
+            raise ValueError("Delivery calculation is only for CDEK pickup points")
 
         _validate_address_for_delivery(data.address)
-
-        if data.delivery_method == DeliveryMethod.COURIER:
-            require_flat_for_courier(data.address.formatted_address)
 
         recipient_city_code = data.address.cdek_city_code
         if recipient_city_code is None:
@@ -121,32 +114,16 @@ class DeliveryService:
             shipment_date=shipment_date,
         )
 
-        pvz_code = None
-        pvz_name = None
-        pvz_address = None
-        pvz_lat = None
-        pvz_lon = None
-        pvz_distance_m = None
-        pvz_search_city_code = None
-
-        if data.delivery_method == DeliveryMethod.PICKUP_POINT:
-            nearest_result = await cdek.find_nearest_pvz(
-                data.address.lat,
-                data.address.lon,
-                city_code=recipient_city_code,
-                postal_code=data.address.postal_code,
-                city_name=data.address.city,
-            )
-            if nearest_result is None:
-                raise ValueError("No pickup points found near this address")
-            nearest = nearest_result.point
-            pvz_search_city_code = nearest_result.resolved_city_code
-            pvz_code = nearest.code
-            pvz_name = nearest.name
-            pvz_address = nearest.address
-            pvz_lat = nearest.lat
-            pvz_lon = nearest.lon
-            pvz_distance_m = nearest.distance_m
+        nearest_result = await cdek.find_nearest_pvz(
+            data.address.lat,
+            data.address.lon,
+            city_code=recipient_city_code,
+            postal_code=data.address.postal_code,
+            city_name=data.address.city,
+        )
+        if nearest_result is None:
+            raise ValueError("No pickup points found near this address")
+        nearest = nearest_result.point
 
         return DeliveryCalculateResponse(
             delivery_cost=tariff.delivery_cost,
@@ -170,11 +147,11 @@ class DeliveryService:
                 else None
             ),
             shipment_date=shipment_date.isoformat(),
-            pvz_code=pvz_code,
-            pvz_name=pvz_name,
-            pvz_address=pvz_address,
-            pvz_lat=pvz_lat,
-            pvz_lon=pvz_lon,
-            pvz_distance_m=pvz_distance_m,
-            pvz_search_city_code=pvz_search_city_code,
+            pvz_code=nearest.code,
+            pvz_name=nearest.name,
+            pvz_address=nearest.address,
+            pvz_lat=nearest.lat,
+            pvz_lon=nearest.lon,
+            pvz_distance_m=nearest.distance_m,
+            pvz_search_city_code=nearest_result.resolved_city_code,
         )

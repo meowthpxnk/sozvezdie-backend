@@ -1,8 +1,14 @@
 import random
 
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
-from app.core.redis_client import redis_client
+from app.core.blocked_1c import (
+    is_blocked_1c_users_enabled,
+    seller_shop_is_disabled,
+    seller_user_has_one_c_id,
+)
 from app.models import Product, ProductImage, Inventory, ProductModeration
 from app.repositories.fandom import FandomRepository
 from app.repositories.subcategory import SubcategoryRepository
@@ -22,6 +28,7 @@ from app.schemas.schemas import (
     ProductCreateForm,
     ProductUpdateForm,
 )
+from app.core.redis_client import redis_client
 from app.media_client import MediaClient
 
 from app.repositories.product import ProductRepository
@@ -62,14 +69,17 @@ class ProductService:
             name=product.name,
             description=product.desc,
             price=product.price,
-            stockCount=product.inventory.quantity,
+            stockCount=(
+                product.inventory.quantity if product.inventory is not None else 0
+            ),
             images=[str(image.image_uuid) for image in product.images],
-            authorId=str(product.seller_card.id),
+            authorId=str(product.seller_card.id) if product.seller_card else "",
             categorySlug=product.category_slug,
             subcategorySlug=(
                 product.subcategory.slug if product.subcategory else None
             ),
             fandomSlug=product.fandom_slug,
+            isAdult=bool(getattr(product, "is_adult", False)),
         )
 
     async def create_product(
@@ -109,6 +119,7 @@ class ProductService:
             category_slug=category_slug,
             subcategory_id=subcategory_id,
             fandom_slug=fandom_slug,
+            is_adult=bool(data.is_adult),
         )
 
         for index, file in enumerate(data.images):
@@ -185,6 +196,10 @@ class ProductService:
         if product.deletion_request_status == ModerationStatus.APPROVED:
             return False
         if product.inventory is None or product.inventory.quantity <= 0:
+            return False
+        if seller_shop_is_disabled(product):
+            return False
+        if is_blocked_1c_users_enabled() and not seller_user_has_one_c_id(product):
             return False
         return True
 
@@ -692,6 +707,14 @@ class ProductService:
         product.category_slug = category_slug
         product.subcategory_id = subcategory_id
         product.fandom_slug = fandom_slug
+        is_adult = bool(data.is_adult)
+        product.is_adult = is_adult
+        flag_modified(product, "is_adult")
+        await self.session.execute(
+            sa_update(Product)
+            .where(Product.id == product.id)
+            .values(is_adult=is_adult)
+        )
 
         if product.inventory is None:
             product.inventory = Inventory(

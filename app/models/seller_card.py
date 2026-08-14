@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -32,6 +32,9 @@ class SellerCard(Base, WithIDMixin):
     tiktok_url: Mapped[str | None] = mapped_column(String, nullable=True)
     telegram_channel_url: Mapped[str | None] = mapped_column(String, nullable=True)
     vk_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_disabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     user: Mapped["User"] = relationship(back_populates="seller_card")
     moderations: Mapped[list["SellerCardModeration"]] = relationship(

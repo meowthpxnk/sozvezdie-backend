@@ -35,10 +35,6 @@ from app.schemas.database import DeliveryMethod, OrderStatus, PaymentMethod
 from app.services.delivery import DeliveryService
 from app.services.integration_tasks import IntegrationTaskService
 from app.services.user_address import UserAddressService
-from app.utils.address_flat import (
-    extract_flat_from_text,
-    require_flat_for_courier,
-)
 
 logger = logging.getLogger("app")
 
@@ -196,10 +192,12 @@ class OrderService:
         if data.delivery_method == DeliveryMethod.SELF_PICKUP:
             return
 
-        if data.delivery_method not in (
-            DeliveryMethod.COURIER,
-            DeliveryMethod.PICKUP_POINT,
-        ):
+        if data.delivery_method == DeliveryMethod.COURIER:
+            raise ValueError(
+                "Door delivery is not available. Use pickup point or self pickup"
+            )
+
+        if data.delivery_method != DeliveryMethod.PICKUP_POINT:
             return
 
         if data.address is None:
@@ -208,33 +206,22 @@ class OrderService:
             raise ValueError("Delivery date is required")
         if data.address.lat is None or data.address.lon is None:
             raise ValueError("Address coordinates are required")
-        if (
-            data.delivery_method == DeliveryMethod.COURIER
-            and not data.address.flat
-        ):
-            raise ValueError("Apartment is required for door delivery")
-        if (
-            data.delivery_method == DeliveryMethod.PICKUP_POINT
-            and not data.address.pvz_code
-        ):
+        if not data.address.pvz_code:
             raise ValueError("Pickup point is required")
 
     async def _resolve_delivery_cost(
         self,
         data: OrderCreateRequest,
     ) -> tuple[int, int | None, str | None, str | None, int | None]:
+        self._validate_delivery_payload(data)
         if data.delivery_method == DeliveryMethod.SELF_PICKUP:
             if data.delivery_cost != 0:
                 raise ValueError("Self pickup delivery cost must be 0")
             return 0, None, None, None, None
 
-        if data.delivery_method not in (
-            DeliveryMethod.COURIER,
-            DeliveryMethod.PICKUP_POINT,
-        ):
+        if data.delivery_method != DeliveryMethod.PICKUP_POINT:
             return data.delivery_cost, None, None, None, None
 
-        self._validate_delivery_payload(data)
         assert data.address is not None
 
         calc = await self.delivery_service.calculate(
@@ -572,10 +559,6 @@ class OrderService:
         ) = await self._resolve_delivery_cost(data)
 
         delivery_flat = None
-        if data.address and data.delivery_method == DeliveryMethod.COURIER:
-            delivery_flat = extract_flat_from_text(
-                data.address.formatted_address
-            )
 
         user_address_id = None
         if data.address and data.delivery_method != DeliveryMethod.SELF_PICKUP:

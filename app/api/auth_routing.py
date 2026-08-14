@@ -94,9 +94,7 @@ class AuthJWTProvider:
     # Private methods
 
     def _gen_exp_time(self, ttl: int, now: datetime.datetime) -> int:
-        return jwt.api_jwt.timegm(
-            (now + datetime.timedelta(seconds=ttl)).utctimetuple()
-        )
+        return int((now + datetime.timedelta(seconds=ttl)).timestamp())
 
     def _gen_payload(
         self,

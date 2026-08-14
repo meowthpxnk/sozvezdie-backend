@@ -1,4 +1,4 @@
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,11 +50,15 @@ class UserRepository:
         self,
         user: User,
         *,
-        full_name: str | None,
+        last_name: str | None,
+        first_name: str | None,
+        patronymic: str | None,
         email: str | None,
         phone: str | None,
     ) -> User:
-        user.full_name = full_name
+        user.last_name = last_name
+        user.first_name = first_name
+        user.patronymic = patronymic
         user.email = email
         user.phone = phone
         await self.session.flush()
@@ -76,18 +80,36 @@ class UserRepository:
         search: str | None = None,
         limit: int = 50,
     ) -> list[User]:
-        stmt = select(User).order_by(User.id.desc()).limit(limit)
+        stmt = (
+            select(User)
+            .options(selectinload(User.seller_card))
+            .order_by(User.id.desc())
+            .limit(limit)
+        )
         if search:
             pattern = f"%{search.strip()}%"
             stmt = stmt.where(
                 or_(
                     User.username.ilike(pattern),
-                    User.full_name.ilike(pattern),
+                    User.last_name.ilike(pattern),
+                    User.first_name.ilike(pattern),
+                    User.patronymic.ilike(pattern),
+                    func.concat_ws(
+                        " ",
+                        User.last_name,
+                        User.first_name,
+                        User.patronymic,
+                    ).ilike(pattern),
                     User.email.ilike(pattern),
                 )
             )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_by_one_c_author_id(self, one_c_author_id: str) -> User | None:
+        stmt = select(User).where(User.one_c_author_id == one_c_author_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def delete(self, user: User) -> None:
         await self.session.delete(user)

@@ -20,6 +20,7 @@ from .seller_card_moderation import SellerCardModeration, SellerCardModerationAc
 from .user_settings import UserSettings
 from .user import User
 from .vk_id_mapping import VkIdMapping
+from .author_invite import AuthorInvite
 from .advert_banner import AdvertBanner
 from .faq_item import FaqItem
 from .integration_task import IntegrationTask

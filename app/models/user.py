@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import Boolean, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.database.mixins import WithIDMixin
 from app.schemas.database import UserRoleEnum
+from app.utils.text import format_person_name
 
 if TYPE_CHECKING:
     from . import (
@@ -28,9 +29,15 @@ class User(Base, WithIDMixin):
     role: Mapped[UserRoleEnum] = mapped_column(
         Enum(UserRoleEnum), nullable=False
     )
-    full_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    patronymic: Mapped[str | None] = mapped_column(String, nullable=True)
     email: Mapped[str | None] = mapped_column(String, nullable=True)
     phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    one_c_author_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    age_confirmed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     settings: Mapped["UserSettings"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")
     seller_card: Mapped["SellerCard"] = relationship(
@@ -68,3 +75,7 @@ class User(Base, WithIDMixin):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def full_name(self) -> str | None:
+        return format_person_name(self.last_name, self.first_name, self.patronymic)

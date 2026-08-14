@@ -1,6 +1,7 @@
 allow_origins:
   - "http://localhost:3000"
   - "http://localhost:3001"
+  - "https://soz.meowthland.ru"
   - "https://soz-front.meowthland.ru"
   - "https://constellationshop.ru"
   - "http://192.168.0.115:3000"

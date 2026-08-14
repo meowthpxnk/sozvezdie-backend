@@ -4,7 +4,7 @@ from typing import Type
 from fastapi import Form
 from inspect import Parameter, signature
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.api.delivery import OrderDeliveryAddressPayload
 from app.schemas.database import (
@@ -177,6 +177,7 @@ class ProductResponse(BaseModel):
     categorySlug: str | None = None
     subcategorySlug: str | None = None
     fandomSlug: str | None = None
+    isAdult: bool = False
 
 
 class SellerProductResponse(ProductResponse):
@@ -438,21 +439,40 @@ class FaqItemResponse(BaseModel):
 
 
 class UserProfileUpdateRequest(BaseModel):
-    full_name: str | None
+    last_name: str | None = Field(default=None, max_length=128)
+    first_name: str | None = Field(default=None, max_length=128)
+    patronymic: str | None = Field(default=None, max_length=128)
     email: str | None
     phone: str | None
+
+    @field_validator("last_name", "first_name", "patronymic")
+    @classmethod
+    def strip_name_fields(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        stripped = v.strip()
+        return stripped or None
 
 
 class UserProfileResponse(BaseModel):
     id: int
     username: str
-    full_name: str | None
+    last_name: str | None
+    first_name: str | None
+    patronymic: str | None
     email: str | None
     phone: str | None
 
 
 class MeResponse(UserProfileResponse):
     role: str
+    one_c_author_id: str | None = None
+    is_blocked_without_1c: bool = False
+    age_confirmed: bool = False
+
+
+class AgeConfirmationResponse(BaseModel):
+    age_confirmed: bool = True
 
 
 class SuperAdminUserResponse(BaseModel):
@@ -463,10 +483,29 @@ class SuperAdminUserResponse(BaseModel):
     email: str | None
     phone: str | None
     is_super_moderator: bool = False
+    one_c_author_id: str | None = None
+    one_c_warning: str | None = None
+    has_seller_card: bool = False
+    seller_card_disabled: bool = False
 
 
 class SuperAdminAssignRoleRequest(BaseModel):
     role: UserRoleEnum
+    one_c_author_id: str | None = None
+    delete_from_1c: bool = False
+    delete_shop: bool = False
+
+
+class SuperAdminAssignOneCRequest(BaseModel):
+    one_c_author_id: str = Field(..., min_length=1)
+
+
+class SuperAdminAuthorInviteRequest(BaseModel):
+    one_c_author_id: str = Field(..., min_length=1)
+
+
+class SuperAdminAuthorInviteResponse(BaseModel):
+    token: str
 
 
 class CreateUserRequest(BaseModel):

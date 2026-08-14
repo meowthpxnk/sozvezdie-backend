@@ -291,9 +291,9 @@ def _pick_tariff(
     delivery_method: DeliveryMethod,
 ) -> CdekTariffResult | None:
     allowed = (
-        COURIER_TARIFF_CODES
-        if delivery_method == DeliveryMethod.COURIER
-        else PVZ_TARIFF_CODES
+        PVZ_TARIFF_CODES
+        if delivery_method == DeliveryMethod.PICKUP_POINT
+        else COURIER_TARIFF_CODES
     )
     candidates: list[CdekTariffResult] = []
     for item in tariffs:
@@ -304,10 +304,15 @@ def _pick_tariff(
             continue
         candidates.append(_tariff_item_to_result(item))
     if not candidates:
+        forbidden = (
+            COURIER_TARIFF_CODES
+            if delivery_method == DeliveryMethod.PICKUP_POINT
+            else PVZ_TARIFF_CODES
+        )
         for item in tariffs:
             cost = item.get("delivery_sum")
             code = item.get("tariff_code")
-            if cost is None or code is None:
+            if cost is None or code is None or code in forbidden:
                 continue
             candidates.append(_tariff_item_to_result(item))
     if not candidates:

@@ -184,6 +184,15 @@ class ModerationService:
                 )
             )
 
+        if product.is_adult:
+            changes.append(
+                ModerationFieldDiffResponse(
+                    label="18+",
+                    before="—",
+                    after="Да",
+                )
+            )
+
         return changes
 
     def _build_brand_changes(

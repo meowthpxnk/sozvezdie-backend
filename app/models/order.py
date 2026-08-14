@@ -20,7 +20,7 @@ class Order(Base, WithIDMixin):
         Enum(PaymentMethod), nullable=False, default=PaymentMethod.CARD_ONLINE
     )
     delivery_method: Mapped[DeliveryMethod] = mapped_column(
-        Enum(DeliveryMethod), nullable=False, default=DeliveryMethod.COURIER
+        Enum(DeliveryMethod), nullable=False, default=DeliveryMethod.SELF_PICKUP
     )
     delivery_cost: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     delivery_date: Mapped[date | None] = mapped_column(Date, nullable=True)

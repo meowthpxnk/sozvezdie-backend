@@ -287,7 +287,7 @@ async def seed_authors(
             username=username,
             password_hash=password_hash,
             role=UserRoleEnum.SELLER,
-            full_name=build_author_name(index),
+            last_name=build_author_name(index),
             email=f"{username}@example.com",
         )
         user.settings = UserSettings(theme=AppTheme.DARK)

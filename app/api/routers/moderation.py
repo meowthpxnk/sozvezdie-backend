@@ -22,6 +22,11 @@ from app.schemas.schemas import ProductImageSlotForm, ProductUpdateForm, SellerC
 from app.services.moderation import ModerationService
 from app.services.product import ProductService
 from app.services.seller_card import SellerCardService
+from app.utils.product_form import (
+    parse_flags_is_adult,
+    parse_image_slots_payload,
+    resolve_is_adult,
+)
 
 router = APIRouter(prefix="/moderation", tags=["Moderation"])
 
@@ -66,6 +71,10 @@ async def update_moderation_proposal_product(
     category_slug: str | None = Form(default=None),
     subcategory_slug: str | None = Form(default=None),
     fandom_slug: str | None = Form(default=None),
+    is_adult: str | None = Form(default=None),
+    flags: str | None = Form(default=None),
+    adult: str | None = Form(default=None),
+    adult_query: str | None = Query(default=None, alias="adult"),
     files: list[UploadFile] = File(default=[]),
 ) -> SellerProductResponse:
     from app.core import media_client
@@ -83,7 +92,7 @@ async def update_moderation_proposal_product(
         ) from error
 
     try:
-        slots_payload = json.loads(image_slots)
+        slots_payload, slots_adult = parse_image_slots_payload(image_slots)
         image_slot_forms = [
             ProductImageSlotForm(
                 type=slot["type"],
@@ -112,6 +121,13 @@ async def update_moderation_proposal_product(
                 category_slug=category_slug,
                 subcategory_slug=subcategory_slug,
                 fandom_slug=fandom_slug,
+                is_adult=resolve_is_adult(
+                    form_value=is_adult,
+                    query_value=adult_query,
+                    form_adult=adult,
+                    slots_adult=slots_adult,
+                    flags_adult=parse_flags_is_adult(flags),
+                ),
             ),
             media_client,
         )
@@ -199,6 +215,10 @@ async def update_moderator_catalog_product(
     category_slug: str | None = Form(default=None),
     subcategory_slug: str | None = Form(default=None),
     fandom_slug: str | None = Form(default=None),
+    is_adult: str | None = Form(default=None),
+    flags: str | None = Form(default=None),
+    adult: str | None = Form(default=None),
+    adult_query: str | None = Query(default=None, alias="adult"),
     files: list[UploadFile] = File(default=[]),
 ) -> SellerProductResponse:
     from app.core import media_client
@@ -206,7 +226,7 @@ async def update_moderator_catalog_product(
     moderator = await require_moderation_access(token, session)
 
     try:
-        slots_payload = json.loads(image_slots)
+        slots_payload, slots_adult = parse_image_slots_payload(image_slots)
         image_slot_forms = [
             ProductImageSlotForm(
                 type=slot["type"],
@@ -235,6 +255,13 @@ async def update_moderator_catalog_product(
                 category_slug=category_slug,
                 subcategory_slug=subcategory_slug,
                 fandom_slug=fandom_slug,
+                is_adult=resolve_is_adult(
+                    form_value=is_adult,
+                    query_value=adult_query,
+                    form_adult=adult,
+                    slots_adult=slots_adult,
+                    flags_adult=parse_flags_is_adult(flags),
+                ),
             ),
             media_client,
             moderator_id=moderator.id,

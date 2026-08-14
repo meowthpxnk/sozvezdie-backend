@@ -14,7 +14,10 @@ from app.schemas.api.responses import (
     SubcategoryAdminCreateRequest,
     SubcategoryResponse,
     SubcategoryUpdateRequest,
+    SuperAdminAssignOneCRequest,
     SuperAdminAssignRoleRequest,
+    SuperAdminAuthorInviteRequest,
+    SuperAdminAuthorInviteResponse,
     SuperAdminUserResponse,
 )
 from app.schemas.database import UserRoleEnum
@@ -54,12 +57,103 @@ async def assign_user_role(
     data: SuperAdminAssignRoleRequest,
 ) -> SuperAdminUserResponse:
     try:
-        return await SuperAdminService(session).assign_role(user_id, data.role)
+        return await SuperAdminService(session).assign_role(
+            user_id,
+            data.role,
+            one_c_author_id=data.one_c_author_id,
+            delete_from_1c=data.delete_from_1c,
+            delete_shop=data.delete_shop,
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         ) from error
+
+
+@router.delete("/users/{user_id}/one-c")
+async def delete_user_one_c(
+    user_id: int,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+) -> SuperAdminUserResponse:
+    try:
+        return await SuperAdminService(session).delete_from_1c(user_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.delete("/users/{user_id}/shop")
+async def delete_user_shop(
+    user_id: int,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+) -> SuperAdminUserResponse:
+    try:
+        return await SuperAdminService(session).delete_shop(user_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.patch("/users/{user_id}/one-c")
+async def assign_user_one_c(
+    user_id: int,
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: SuperAdminAssignOneCRequest,
+) -> SuperAdminUserResponse:
+    try:
+        return await SuperAdminService(session).assign_one_c_author_id(
+            user_id, data.one_c_author_id
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.post("/one-c/authors")
+async def generate_one_c_author(
+    _: SuperModeratorDepends,
+):
+    from app.integrations.one_c import OneCUnavailable, create_author
+
+    try:
+        await create_author()
+    except OneCUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error.message,
+        ) from error
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Нет доступа к 1C введите код вручную",
+    )
+
+
+@router.post("/author-invites", status_code=status.HTTP_201_CREATED)
+async def create_author_invite(
+    _: SuperModeratorDepends,
+    session: DatabaseDepends,
+    data: SuperAdminAuthorInviteRequest,
+) -> SuperAdminAuthorInviteResponse:
+    try:
+        invite = await SuperAdminService(session).create_author_invite(
+            data.one_c_author_id
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    return SuperAdminAuthorInviteResponse(token=invite.token)
 
 
 @router.get("/banners")

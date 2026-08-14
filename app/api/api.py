@@ -10,6 +10,7 @@ from app.core import database
 from app.services.integration_tasks import integration_task_publisher_loop
 from app.workers.integration_worker import main as integration_worker_main
 from app.schemas.api.config import CorsConfig
+from app.services.schema_bootstrap import ensure_adult_content_columns
 from app.services.super_moderator_bootstrap import ensure_super_moderator_user
 from app.settings import ApiSettings
 from app.utils.files import read_yaml_model
@@ -22,6 +23,7 @@ async def app_lifespan(app: FastAPI):
     publisher_task: asyncio.Task | None = None
     worker_task: asyncio.Task | None = None
     async with database.session() as session:
+        await ensure_adult_content_columns(session)
         await ensure_super_moderator_user(session)
     try:
         publisher_task = asyncio.create_task(integration_task_publisher_loop())

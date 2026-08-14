@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, false as sql_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -41,6 +41,9 @@ class Product(Base, WithIDMixin):
     deletion_request_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     deletion_requested_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
+    )
+    is_adult: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sql_false()
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.now

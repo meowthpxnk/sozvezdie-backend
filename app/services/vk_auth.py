@@ -12,6 +12,7 @@ from app.repositories.specs.user import UserSpec
 from app.repositories.user import UserRepository
 from app.repositories.vk_id_mapping import VkIdMappingRepository
 from app.schemas.database import UserRoleEnum
+from app.services.author_invite import AuthorInviteService
 from app.utils import security
 from app.utils.random_password import generate_random_password
 from app.utils.vk_username import allocate_username
@@ -64,7 +65,15 @@ class VkAuthService:
 
         logger.info("VK mapping not found, creating user for vk_id=%s", vk_user.id)
         try:
-            user = await self._create_vk_user(vk_user)
+            user = await self._create_vk_user(
+                vk_user, author_invite=data.author_invite
+            )
+        except ValueError as error:
+            await self.session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(error),
+            ) from error
         except IntegrityError as error:
             await self.session.rollback()
             logger.warning(
@@ -108,7 +117,9 @@ class VkAuthService:
         )
         return await auth_api.authorize_vk_user(user, response)
 
-    async def _create_vk_user(self, vk_user) -> User:
+    async def _create_vk_user(
+        self, vk_user, *, author_invite: str | None = None
+    ) -> User:
         logger.debug(
             "Allocating username for vk_id=%s screen_name=%s",
             vk_user.id,
@@ -121,13 +132,16 @@ class VkAuthService:
             last_name=vk_user.last_name,
         )
         password = generate_random_password()
-        full_name = f"{vk_user.first_name} {vk_user.last_name}".strip()
+        last_name = vk_user.last_name.strip() or None
+        first_name = vk_user.first_name.strip() or None
 
         user = User(
             username=username,
             password_hash=security.hash_secret(password),
             role=UserRoleEnum.CUSTOMER,
-            full_name=full_name or None,
+            last_name=last_name,
+            first_name=first_name,
+            patronymic=None,
             email=None,
             phone=None,
             settings=UserSettings(),
@@ -139,6 +153,9 @@ class VkAuthService:
 
         self.mapping_repo.add(
             VkIdMapping(vk_id=vk_user.id, user_id=user.id),
+        )
+        await AuthorInviteService(self.session).apply_invite_to_new_user(
+            user, author_invite
         )
         await self.session.commit()
         await self.session.refresh(user)

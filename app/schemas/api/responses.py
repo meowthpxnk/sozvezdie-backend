@@ -462,6 +462,7 @@ class UserProfileResponse(BaseModel):
     patronymic: str | None
     email: str | None
     phone: str | None
+    email_verified: bool = False
 
 
 class MeResponse(UserProfileResponse):
@@ -469,6 +470,17 @@ class MeResponse(UserProfileResponse):
     one_c_author_id: str | None = None
     is_blocked_without_1c: bool = False
     age_confirmed: bool = False
+    email_verified: bool = False
+
+
+class EmailVerificationResponse(BaseModel):
+    email: str
+    email_verified: bool = False
+
+
+class EmailVerifiedResponse(BaseModel):
+    email: str | None
+    email_verified: bool = True
 
 
 class AgeConfirmationResponse(BaseModel):

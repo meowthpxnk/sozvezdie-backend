@@ -23,6 +23,7 @@ def _to_profile_response(user) -> UserProfileResponse:
         patronymic=user.patronymic,
         email=user.email,
         phone=user.phone,
+        email_verified=bool(user.email_verified),
     )
 
 

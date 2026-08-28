@@ -446,6 +446,14 @@ class AuthAPI:
             SessionString(username, session_id)
         )
 
+    async def revoke_all_sessions(self, username: str) -> None:
+        await self.auth_service.close_sessions(SessionString(username))
+
+    async def issue_session(
+        self, user: UserModel, response: Response
+    ) -> str:
+        return await self.authorize_vk_user(user, response)
+
     def refresh_cookie_path(self) -> str:
         return self.settings.refresh_cookie_path()
 

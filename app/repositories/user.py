@@ -106,6 +106,19 @@ class UserRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_by_email(self, email: str) -> User | None:
+        normalized = email.strip().lower()
+        if not normalized:
+            return None
+        stmt = (
+            select(User)
+            .where(func.lower(User.email) == normalized)
+            .order_by(User.id.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_by_one_c_author_id(self, one_c_author_id: str) -> User | None:
         stmt = select(User).where(User.one_c_author_id == one_c_author_id)
         result = await self.session.execute(stmt)

@@ -18,6 +18,7 @@ from app.repositories.user import UserRepository
 
 from app.repositories.specs.user import UserSpec
 from app.services.author_invite import AuthorInviteService
+from app.services.email_otp import EmailOtpService
 
 # from app.repositories.specs.user_settings import UserSettingsSpec
 # from app.services.seller_card import SellerCardService
@@ -45,6 +46,9 @@ class UserService:
         self,
         data: UserCreateForm,
     ) -> User:
+        existing = await self.get_user(data.username)
+        if existing is not None:
+            raise ValueError("Это имя пользователя уже занято")
 
         user = User(
             username=data.username,
@@ -55,6 +59,7 @@ class UserService:
             patronymic=data.patronymic,
             email=data.email,
             phone=data.phone,
+            email_verified=False,
             settings=UserSettings(),
         )
 
@@ -116,14 +121,23 @@ class UserService:
         if user is None:
             return None
 
+        next_email = data.email
+        if next_email is not None:
+            next_email = next_email.strip().lower() or None
+        email_changed = (user.email or "").strip().lower() != (next_email or "")
+
         updated = await self.repo.update_profile(
             user,
             last_name=data.last_name,
             first_name=data.first_name,
             patronymic=data.patronymic,
-            email=data.email,
+            email=next_email,
             phone=data.phone,
         )
+        if email_changed:
+            updated.email_verified = False
+            await self.session.flush()
+            await EmailOtpService(self.session).invalidate_verification(updated.id)
         await self.session.commit()
         await self.session.refresh(updated)
         return updated

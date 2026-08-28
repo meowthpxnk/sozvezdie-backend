@@ -102,6 +102,72 @@ class UserCreateForm(BaseModel):
         return v.strip().lower()
 
 
+class SendEmailVerificationForm(BaseModel):
+    email: str | None = Field(default=None, max_length=254)
+    resend: bool = True
+
+    @field_validator("email")
+    @classmethod
+    def normalize_optional_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        stripped = v.strip().lower()
+        if not stripped:
+            return None
+        if "@" not in stripped or "." not in stripped.split("@")[-1]:
+            raise ValueError("Некорректный email")
+        return stripped
+
+
+class VerifyEmailCodeForm(BaseModel):
+    code: str = Field(..., min_length=4, max_length=12)
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        digits = "".join(ch for ch in v.strip() if ch.isdigit())
+        if len(digits) != 6:
+            raise ValueError("Код должен состоять из 6 цифр")
+        return digits
+
+
+class ForgotPasswordForm(BaseModel):
+    email: str = Field(
+        ...,
+        max_length=254,
+        pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$",
+    )
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class ResetPasswordForm(BaseModel):
+    uid: int = Field(..., ge=1)
+    code: str = Field(..., min_length=4, max_length=12)
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="Password must be at least 8 characters",
+    )
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        digits = "".join(ch for ch in v.strip() if ch.isdigit())
+        if len(digits) != 6:
+            raise ValueError("Код должен состоять из 6 цифр")
+        return digits
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+
 class ChangePasswordForm(BaseModel):
     current_password: str = Field(..., min_length=1, max_length=128)
     new_password: str = Field(

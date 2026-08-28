@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions.email import require_verified_email
 from app.integrations import yookassa
 from app.integrations.yookassa_payment import is_payment_successful
 from app.models import CheckoutPayment, CheckoutPaymentStatus, User
@@ -303,6 +304,10 @@ class CheckoutPaymentService:
     ) -> CheckoutPaymentInitResponse:
         if data.payment_method != PaymentMethod.CARD_ONLINE:
             raise ValueError("Only CARD_ONLINE uses initiate-payment")
+        require_verified_email(
+            email=customer.email,
+            email_verified=bool(customer.email_verified),
+        )
 
         fingerprint = build_cart_fingerprint(data)
 

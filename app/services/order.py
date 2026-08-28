@@ -6,6 +6,7 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions.email import require_verified_email
 from app.exceptions.order import InsufficientStockError
 from app.integrations import cdek
 from app.models import Inventory, Order, OrderItem, Product, User
@@ -728,6 +729,10 @@ class OrderService:
             )
         if customer is None:
             raise ValueError("Customer is required")
+        require_verified_email(
+            email=customer.email,
+            email_verified=bool(customer.email_verified),
+        )
 
         context = await self.prepare_order_context(user_id, data)
         return await self._create_order_from_context(

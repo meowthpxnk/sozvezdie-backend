@@ -38,6 +38,9 @@ class User(Base, WithIDMixin):
     age_confirmed: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     settings: Mapped["UserSettings"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")
     seller_card: Mapped["SellerCard"] = relationship(

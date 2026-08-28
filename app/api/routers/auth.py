@@ -2,11 +2,10 @@ import logging
 from io import BytesIO
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, File, HTTPException, Query, Request, Response, status, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from fastapi import Response, Request
-from fastapi import UploadFile, File
+from sqlalchemy.exc import IntegrityError
 from app.api.dependencies import (
     DatabaseDepends,
     BearerAuthDepends,
@@ -15,11 +14,23 @@ from app.api.dependencies import (
 
 from app.core.super_moderator import resolve_auth_role
 from app.core.blocked_1c import is_user_blocked_without_1c
-from app.schemas.api.responses import MeResponse
+from app.schemas.api.responses import (
+    EmailVerificationResponse,
+    EmailVerifiedResponse,
+    MeResponse,
+)
 from app.exceptions.security import WrongSecret
-from app.schemas.schemas import ChangePasswordForm, UserCreateForm
+from app.schemas.schemas import (
+    ChangePasswordForm,
+    ForgotPasswordForm,
+    ResetPasswordForm,
+    SendEmailVerificationForm,
+    UserCreateForm,
+    VerifyEmailCodeForm,
+)
 from app.schemas.vk import VkAuthoriseRequest
 from app.services import UserService
+from app.services.email_otp import EmailOtpService
 from app.services.vk_auth import VkAuthService
 
 logger = logging.getLogger("app")
@@ -28,6 +39,10 @@ logger = logging.getLogger("app")
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class UsernameAvailableResponse(BaseModel):
+    available: bool
 
 
 router = APIRouter()
@@ -115,19 +130,43 @@ async def refresh_token(
     return {"Access-Token": access_token}
 
 
+@router.get("/username-available", response_model=UsernameAvailableResponse)
+async def username_available(
+    db_session: DatabaseDepends,
+    username: str = Query(..., min_length=1, max_length=32),
+):
+    normalized = username.strip().lower()
+    if not normalized:
+        return UsernameAvailableResponse(available=False)
+    user = await UserService(db_session).get_user(normalized)
+    return UsernameAvailableResponse(available=user is None)
+
+
 @router.post("/create-user")
 async def create_user(
     data: UserCreateForm,
     db_session: DatabaseDepends,
 ):
-    # TODO: remove this after testing
     try:
-        await UserService(db_session).create_user(data)
+        user = await UserService(db_session).create_user(data)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         ) from error
+    except IntegrityError as error:
+        await db_session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Это имя пользователя уже занято",
+        ) from error
+
+    try:
+        await EmailOtpService(db_session).send_verification_code(user)
+    except Exception:
+        logger.exception(
+            "Failed to send verification email after registration"
+        )
 
 
 @router.get("/me")
@@ -156,6 +195,7 @@ async def get_me(
             one_c_author_id=user.one_c_author_id,
         ),
         age_confirmed=bool(user.age_confirmed),
+        email_verified=bool(user.email_verified),
     )
 
 
@@ -178,6 +218,131 @@ async def change_password(
             detail=str(error),
         )
     return {"detail": "Password changed successfully"}
+
+
+@router.post("/email/send-verification-code")
+async def send_email_verification_code(
+    token: BearerAuthDepends,
+    db_session: DatabaseDepends,
+    data: SendEmailVerificationForm,
+) -> EmailVerificationResponse:
+    user = await UserService(db_session).get_user(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    email = await EmailOtpService(db_session).send_verification_code(
+        user,
+        data.email,
+        resend=data.resend,
+    )
+    return EmailVerificationResponse(email=email, email_verified=False)
+
+
+@router.post("/email/verify-code")
+async def verify_email_code(
+    token: BearerAuthDepends,
+    db_session: DatabaseDepends,
+    data: VerifyEmailCodeForm,
+) -> EmailVerifiedResponse:
+    user = await UserService(db_session).get_user(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    verified = await EmailOtpService(db_session).confirm_verification_code(
+        user,
+        data.code,
+    )
+    return EmailVerifiedResponse(
+        email=verified.email,
+        email_verified=True,
+    )
+
+
+@router.get("/email/verify")
+async def verify_email_by_link(
+    db_session: DatabaseDepends,
+    uid: int = Query(..., ge=1),
+    code: str = Query(..., min_length=4, max_length=12),
+) -> EmailVerifiedResponse:
+    user = await UserService(db_session).get_user_by_id(uid)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Неверная или устаревшая ссылка",
+        )
+    verified = await EmailOtpService(db_session).confirm_verification_code(
+        user,
+        code,
+    )
+    return EmailVerifiedResponse(
+        email=verified.email,
+        email_verified=True,
+    )
+
+
+@router.post("/password/forgot")
+async def forgot_password(
+    data: ForgotPasswordForm,
+    db_session: DatabaseDepends,
+) -> dict[str, str]:
+    try:
+        await EmailOtpService(db_session).send_password_reset_code(data.email)
+    except HTTPException as error:
+        if error.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            raise
+        if error.status_code >= 500:
+            logger.exception("Failed to send password reset email")
+    except Exception:
+        logger.exception("Failed to send password reset email")
+    return {
+        "detail": (
+            "Если аккаунт с такой почтой существует, "
+            "мы отправили ссылку для смены пароля. "
+            "Если письма нет во входящих, проверьте папку «Спам»"
+        )
+    }
+
+
+@router.post("/password/change-request")
+async def request_password_change(
+    token: BearerAuthDepends,
+    db_session: DatabaseDepends,
+) -> dict[str, str]:
+    user = await UserService(db_session).get_user(token.username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    email = await EmailOtpService(db_session).send_password_reset_for_user(user)
+    return {
+        "detail": (
+            f"Мы отправили ссылку на {email}. "
+            "Если письма нет во входящих, проверьте папку «Спам»"
+        ),
+        "email": email,
+    }
+
+
+@router.post("/password/reset")
+async def reset_password(
+    data: ResetPasswordForm,
+    db_session: DatabaseDepends,
+    auth_api: AuthAPIDepends,
+    response: Response,
+) -> dict[str, str]:
+    user = await EmailOtpService(db_session).reset_password(
+        user_id=data.uid,
+        code=data.code,
+        new_password=data.new_password,
+    )
+    await auth_api.revoke_all_sessions(user.username)
+    access_token = await auth_api.issue_session(user, response)
+    return {"Access-Token": access_token}
 
 
 @router.patch("/logout")
